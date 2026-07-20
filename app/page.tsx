@@ -10,14 +10,9 @@ export default function HomePage() {
       <header className="border-b">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
           <p className="text-lg font-semibold">Classroom Management Platform</p>
-          <div className="flex gap-2">
-            <Link href="/auth/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link href="/institutional-onboarding">
-              <Button>Register Institution</Button>
-            </Link>
-          </div>
+          <Link href="/auth/login">
+            <Button>Login</Button>
+          </Link>
         </div>
       </header>
 
@@ -30,19 +25,12 @@ export default function HomePage() {
             Real-time attendance tracking, automated parent SMS alerts, study habit monitoring,
             and hybrid SaaS billing for academic institutes.
           </p>
-          <div className="flex gap-3">
-            <Link href="/auth/login">
-              <Button size="lg">
-                Get Started
-                <ArrowRight className="size-4" />
-              </Button>
-            </Link>
-            <Link href="/institutional-onboarding">
-              <Button size="lg" variant="outline">
-                Onboard Institution
-              </Button>
-            </Link>
-          </div>
+          <Link href="/auth/login">
+            <Button size="lg">
+              Get Started
+              <ArrowRight className="size-4" />
+            </Button>
+          </Link>
         </div>
       </section>
 
