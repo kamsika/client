@@ -8,13 +8,8 @@ import { DashboardShell } from "@/components/dashboard-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { downloadBlob } from "@/lib/download"
+import { getAdminNav } from "@/lib/admin-nav"
 import { downloadImportTemplate, importStudents } from "@/services/student"
-
-const adminNav = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/billing", label: "Billing" },
-  { href: "/admin/students/import", label: "Import Students" },
-]
 
 export default function ImportStudentsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
@@ -44,7 +39,7 @@ export default function ImportStudentsPage() {
   }
 
   return (
-    <DashboardShell title="Import Students" navItems={adminNav} allowedRoles={["institution_admin"]}>
+    <DashboardShell title="Import Students" navItems={getAdminNav(false)} allowedRoles={["institution_admin"]}>
       <div className="grid gap-6">
         <Card>
           <CardHeader>
