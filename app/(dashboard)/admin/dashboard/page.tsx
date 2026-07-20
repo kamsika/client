@@ -71,6 +71,7 @@ export default function AdminDashboardPage() {
       if (isSuperAdmin) {
         const inst = await listInstitutions()
         setInstitutions(inst)
+        return
       }
       const [cls, std, logs, tch] = await Promise.all([
         listClassrooms(),
@@ -165,26 +166,28 @@ export default function AdminDashboardPage() {
   return (
     <DashboardShell title="Admin Dashboard" navItems={adminNav} allowedRoles={allowedRoles}>
       <div className="grid gap-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardDescription>Classrooms</CardDescription>
-              <CardTitle className="text-3xl">{classrooms.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>Students</CardDescription>
-              <CardTitle className="text-3xl">{students.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardDescription>SMS Sent (Recent)</CardDescription>
-              <CardTitle className="text-3xl">{smsLogs.length}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+        {!isSuperAdmin && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardDescription>Classrooms</CardDescription>
+                <CardTitle className="text-3xl">{classrooms.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardDescription>Students</CardDescription>
+                <CardTitle className="text-3xl">{students.length}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardDescription>SMS Sent (Recent)</CardDescription>
+                <CardTitle className="text-3xl">{smsLogs.length}</CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        )}
 
         {isSuperAdmin && (
           <Card>
@@ -341,15 +344,17 @@ export default function AdminDashboardPage() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent SMS Logs</CardTitle>
-            <CardDescription>Delivery audit trail</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <LogsTable data={smsLogs} columns={smsColumns} />
-          </CardContent>
-        </Card>
+        {!isSuperAdmin && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent SMS Logs</CardTitle>
+              <CardDescription>Delivery audit trail</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LogsTable data={smsLogs} columns={smsColumns} />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardShell>
   )
