@@ -15,15 +15,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getStoredUser } from "@/lib/api-client"
+import { getAdminNav } from "@/lib/admin-nav"
 import { getBilling, listInstitutions } from "@/services/institution"
 import { listSmsLogs } from "@/services/sms-log"
 import type { BillingRecord, Institution, SmsLog, User } from "@/types"
-
-const adminNav = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/billing", label: "Billing" },
-  { href: "/admin/students/import", label: "Import Students" },
-]
 
 export default function AdminBillingPage() {
   const user = getStoredUser<User>()
@@ -78,7 +73,7 @@ export default function AdminBillingPage() {
   const current = billing[0]
 
   return (
-    <DashboardShell title="Billing" navItems={adminNav} allowedRoles={["institution_admin", "super_admin"]}>
+    <DashboardShell title="Billing" navItems={getAdminNav(isSuperAdmin)} allowedRoles={["institution_admin", "super_admin"]}>
       <div className="grid gap-6">
         {isSuperAdmin && institutions.length > 0 && (
           <Select
