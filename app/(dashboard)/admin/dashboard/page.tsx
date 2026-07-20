@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getStoredUser } from "@/lib/api-client"
+import { registerInstitution } from "@/services/auth"
 import { createClassroom, listClassrooms } from "@/services/classroom"
 import { listInstitutions, updateInstitutionStatus } from "@/services/institution"
 import { listSmsLogs } from "@/services/sms-log"
@@ -49,7 +50,17 @@ export default function AdminDashboardPage() {
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
   const [open, setOpen] = useState(false)
+  const [institutionOpen, setInstitutionOpen] = useState(false)
   const [form, setForm] = useState({ name: "", schedule_start_time: "09:00", teacher_id: "" })
+  const [institutionForm, setInstitutionForm] = useState({
+    name: "",
+    subdomain: "",
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
+    admin_phone: "",
+  })
+  const [creatingInstitution, setCreatingInstitution] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -106,6 +117,44 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleCreateInstitution() {
+    const { name, subdomain, admin_name, admin_email, admin_password } = institutionForm
+    if (!name || !subdomain || !admin_name || !admin_email || !admin_password) {
+      toast.error("Fill all required institution fields")
+      return
+    }
+    if (!/^[a-z0-9-]+$/.test(subdomain)) {
+      toast.error("Subdomain must be lowercase letters, numbers, and hyphens only")
+      return
+    }
+    setCreatingInstitution(true)
+    try {
+      await registerInstitution({
+        name,
+        subdomain,
+        admin_name,
+        admin_email,
+        admin_password,
+        admin_phone: institutionForm.admin_phone || undefined,
+      })
+      toast.success("Institution created successfully")
+      setInstitutionOpen(false)
+      setInstitutionForm({
+        name: "",
+        subdomain: "",
+        admin_name: "",
+        admin_email: "",
+        admin_password: "",
+        admin_phone: "",
+      })
+      loadData()
+    } catch {
+      toast.error("Failed to create institution. Subdomain or email may already exist.")
+    } finally {
+      setCreatingInstitution(false)
+    }
+  }
+
   const smsColumns: ColumnDef<SmsLog>[] = [
     { accessorKey: "sent_at", header: "Sent At", cell: ({ row }) => new Date(row.original.sent_at).toLocaleString() },
     { accessorKey: "recipient_phone", header: "Phone" },
@@ -139,11 +188,76 @@ export default function AdminDashboardPage() {
 
         {isSuperAdmin && (
           <Card>
-            <CardHeader>
-              <CardTitle>Institutions</CardTitle>
-              <CardDescription>Manage tenant activation and status</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Institutions</CardTitle>
+                <CardDescription>Manage tenant activation and status</CardDescription>
+              </div>
+              <Dialog open={institutionOpen} onOpenChange={setInstitutionOpen}>
+                <DialogTrigger render={<Button />}>Create Institution</DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>New Institution</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Institution Name</Label>
+                      <Input
+                        value={institutionForm.name}
+                        onChange={(e) => setInstitutionForm({ ...institutionForm, name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Subdomain</Label>
+                      <Input
+                        placeholder="my-center"
+                        value={institutionForm.subdomain}
+                        onChange={(e) =>
+                          setInstitutionForm({ ...institutionForm, subdomain: e.target.value.toLowerCase() })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Admin Full Name</Label>
+                      <Input
+                        value={institutionForm.admin_name}
+                        onChange={(e) => setInstitutionForm({ ...institutionForm, admin_name: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Admin Email</Label>
+                      <Input
+                        type="email"
+                        value={institutionForm.admin_email}
+                        onChange={(e) => setInstitutionForm({ ...institutionForm, admin_email: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Admin Phone (optional)</Label>
+                      <Input
+                        value={institutionForm.admin_phone}
+                        onChange={(e) => setInstitutionForm({ ...institutionForm, admin_phone: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Admin Password</Label>
+                      <Input
+                        type="password"
+                        value={institutionForm.admin_password}
+                        onChange={(e) => setInstitutionForm({ ...institutionForm, admin_password: e.target.value })}
+                      />
+                    </div>
+                    <Button onClick={handleCreateInstitution} disabled={creatingInstitution}>
+                      {creatingInstitution ? "Creating..." : "Create Institution"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="space-y-3">
+              {institutions.length === 0 && (
+                <p className="text-muted-foreground text-sm">No institutions yet. Create one to get started.</p>
+              )}
               {institutions.map((inst) => (
                 <div key={inst.id} className="flex items-center justify-between rounded-lg border p-4">
                   <div>
