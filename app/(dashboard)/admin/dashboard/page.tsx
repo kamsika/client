@@ -26,18 +26,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getStoredUser } from "@/lib/api-client"
+import { getAdminNav } from "@/lib/admin-nav"
 import { registerInstitution } from "@/services/auth"
 import { createClassroom, listClassrooms } from "@/services/classroom"
 import { listInstitutions, updateInstitutionStatus } from "@/services/institution"
 import { listSmsLogs } from "@/services/sms-log"
 import { listStudents, listTeachers } from "@/services/student"
 import type { Classroom, Institution, SmsLog, User } from "@/types"
-
-const adminNav = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/billing", label: "Billing" },
-  { href: "/admin/students/import", label: "Import Students" },
-]
 
 export default function AdminDashboardPage() {
   const user = getStoredUser<User>()
@@ -164,7 +159,7 @@ export default function AdminDashboardPage() {
   ]
 
   return (
-    <DashboardShell title="Admin Dashboard" navItems={adminNav} allowedRoles={allowedRoles}>
+    <DashboardShell title="Admin Dashboard" navItems={getAdminNav(isSuperAdmin)} allowedRoles={allowedRoles}>
       <div className="grid gap-6">
         {!isSuperAdmin && (
           <div className="grid gap-4 md:grid-cols-3">
