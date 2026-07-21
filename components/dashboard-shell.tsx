@@ -47,7 +47,11 @@ export function DashboardShell({ children, navItems, title, allowedRoles }: Dash
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <div>
             <h1 className="text-lg font-semibold">{title}</h1>
-            <p className="text-muted-foreground text-sm">{user.full_name} · {user.role.replace("_", " ")}</p>
+            {user.role !== "teacher" && (
+              <p className="text-muted-foreground text-sm">
+                {user.full_name} · {user.role.replace("_", " ")}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
