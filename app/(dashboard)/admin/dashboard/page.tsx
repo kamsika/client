@@ -1,11 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
-import { LogsTable, StatusBadge } from "@/components/logs-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -76,7 +74,7 @@ export default function AdminDashboardPage() {
       ])
       setClassrooms(cls)
       setStudents(std)
-      setSmsLogs(logs.slice(0, 10))
+      setSmsLogs(logs)
       setTeachers(tch)
     } catch {
       toast.error("Failed to load dashboard data")
@@ -151,13 +149,6 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const smsColumns: ColumnDef<SmsLog>[] = [
-    { accessorKey: "sent_at", header: "Sent At", cell: ({ row }) => new Date(row.original.sent_at).toLocaleString() },
-    { accessorKey: "recipient_phone", header: "Phone" },
-    { accessorKey: "message_body", header: "Message" },
-    { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
-  ]
-
   return (
     <DashboardShell title="Admin Dashboard" navItems={getAdminNav(isSuperAdmin)} allowedRoles={allowedRoles}>
       <div className="grid gap-6">
@@ -177,7 +168,7 @@ export default function AdminDashboardPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardDescription>SMS Sent (Recent)</CardDescription>
+                <CardDescription>SMS Sent</CardDescription>
                 <CardTitle className="text-3xl">{smsLogs.length}</CardTitle>
               </CardHeader>
             </Card>
@@ -339,17 +330,6 @@ export default function AdminDashboardPage() {
           </Card>
         )}
 
-        {!isSuperAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent SMS Logs</CardTitle>
-              <CardDescription>Delivery audit trail</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LogsTable data={smsLogs} columns={smsColumns} />
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardShell>
   )
