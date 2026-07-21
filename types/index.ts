@@ -36,6 +36,7 @@ export interface Student {
   email: string | null
   parent_name: string | null
   parent_phone: string | null
+  has_face_descriptor?: boolean
 }
 
 export interface Attendance {
