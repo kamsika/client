@@ -2,11 +2,9 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { QrCode } from "lucide-react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
-import { QrAttendanceDialog } from "@/components/qr-attendance-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { listClassrooms } from "@/services/classroom"
@@ -16,7 +14,6 @@ const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
 
 export default function TeacherDashboardPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [qrClassroom, setQrClassroom] = useState<Classroom | null>(null)
 
   useEffect(() => {
     listClassrooms()
@@ -38,15 +35,9 @@ export default function TeacherDashboardPage() {
                 <p className="font-medium">{cls.name}</p>
                 <p className="text-muted-foreground text-sm">Starts at {cls.schedule_start_time}</p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => setQrClassroom(cls)}>
-                  <QrCode className="size-4" />
-                  Scan QR Code for Attendance
-                </Button>
-                <Link href={`/teacher/classroom/${cls.id}/attendance`}>
-                  <Button>Mark Attendance</Button>
-                </Link>
-              </div>
+              <Link href={`/teacher/classroom/${cls.id}/attendance`}>
+                <Button>Mark Attendance</Button>
+              </Link>
             </div>
           ))}
           {classrooms.length === 0 && (
@@ -54,17 +45,6 @@ export default function TeacherDashboardPage() {
           )}
         </CardContent>
       </Card>
-
-      {qrClassroom && (
-        <QrAttendanceDialog
-          classroomId={qrClassroom.id}
-          classroomName={qrClassroom.name}
-          open={Boolean(qrClassroom)}
-          onOpenChange={(open) => {
-            if (!open) setQrClassroom(null)
-          }}
-        />
-      )}
     </DashboardShell>
   )
 }
