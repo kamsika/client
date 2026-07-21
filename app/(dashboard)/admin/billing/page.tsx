@@ -17,8 +17,7 @@ import {
 import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
 import { getBilling, listInstitutions } from "@/services/institution"
-import { listSmsLogs } from "@/services/sms-log"
-import type { BillingRecord, Institution, SmsLog, User } from "@/types"
+import type { BillingRecord, Institution, User } from "@/types"
 
 export default function AdminBillingPage() {
   const user = getStoredUser<User>()
@@ -29,7 +28,6 @@ export default function AdminBillingPage() {
     user?.institution_id ?? null
   )
   const [billing, setBilling] = useState<BillingRecord[]>([])
-  const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -50,12 +48,8 @@ export default function AdminBillingPage() {
 
   async function loadData(institutionId: number) {
     try {
-      const [billingData, logs] = await Promise.all([
-        getBilling(institutionId),
-        isSuperAdmin ? Promise.resolve([]) : listSmsLogs(),
-      ])
+      const [billingData] = await Promise.all([getBilling(institutionId)])
       setBilling(billingData)
-      if (!isSuperAdmin) setSmsLogs(logs)
     } catch {
       toast.error("Failed to load billing data")
     }
@@ -131,26 +125,6 @@ export default function AdminBillingPage() {
             <LogsTable data={billing} columns={billingColumns} emptyMessage="No billing records yet." />
           </CardContent>
         </Card>
-
-        {!isSuperAdmin && (
-          <Card>
-            <CardHeader>
-              <CardTitle>SMS Delivery Logs</CardTitle>
-              <CardDescription>Complete audit trail for dispute resolution</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <LogsTable
-                data={smsLogs}
-                columns={[
-                  { accessorKey: "sent_at", header: "Sent At", cell: ({ row }) => new Date(row.original.sent_at).toLocaleString() },
-                  { accessorKey: "recipient_phone", header: "Phone" },
-                  { accessorKey: "message_body", header: "Message" },
-                  { accessorKey: "status", header: "Status" },
-                ]}
-              />
-            </CardContent>
-          </Card>
-        )}
       </div>
     </DashboardShell>
   )
