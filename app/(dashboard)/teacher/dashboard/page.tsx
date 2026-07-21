@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { QrCode } from "lucide-react"
+import { QrCode, ScanFace } from "lucide-react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
+import { FaceAttendanceDialog } from "@/components/face-attendance-dialog"
 import { QrAttendanceDialog } from "@/components/qr-attendance-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,6 +18,7 @@ const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
 export default function TeacherDashboardPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [qrClassroom, setQrClassroom] = useState<Classroom | null>(null)
+  const [faceClassroom, setFaceClassroom] = useState<Classroom | null>(null)
 
   useEffect(() => {
     listClassrooms()
@@ -39,6 +41,10 @@ export default function TeacherDashboardPage() {
                 <p className="text-muted-foreground text-sm">Starts at {cls.schedule_start_time}</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => setFaceClassroom(cls)}>
+                  <ScanFace className="size-4" />
+                  Face Attendance
+                </Button>
                 <Button variant="outline" onClick={() => setQrClassroom(cls)}>
                   <QrCode className="size-4" />
                   Scan QR for Attendance
@@ -54,6 +60,17 @@ export default function TeacherDashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {faceClassroom && (
+        <FaceAttendanceDialog
+          classroomId={faceClassroom.id}
+          classroomName={faceClassroom.name}
+          open={Boolean(faceClassroom)}
+          onOpenChange={(open) => {
+            if (!open) setFaceClassroom(null)
+          }}
+        />
+      )}
 
       {qrClassroom && (
         <QrAttendanceDialog
