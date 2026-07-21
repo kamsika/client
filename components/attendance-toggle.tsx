@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Clock, X } from "lucide-react"
+import { Check, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -43,16 +43,6 @@ export function AttendanceToggle({
         >
           <Check className="size-4" />
           Present
-        </Button>
-        <Button
-          size="sm"
-          variant={status === "Late" ? "default" : "outline"}
-          disabled={loading}
-          onClick={() => onMark(studentId)}
-          className={cn(status === "Late" && "bg-amber-500 hover:bg-amber-600")}
-        >
-          <Clock className="size-4" />
-          Mark
         </Button>
         <Button
           size="sm"
