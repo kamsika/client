@@ -47,7 +47,9 @@ export default function ClassroomAttendancePage() {
       toast.success(
         result.attendance.status === "Late"
           ? `Marked late (${result.delta_minutes} min) — parent SMS triggered`
-          : `Marked ${result.attendance.status}`
+          : result.attendance.status === "Absent"
+            ? "Marked absent — parent SMS triggered"
+            : `Marked ${result.attendance.status}`
       )
       await loadAttendance()
     } catch {
