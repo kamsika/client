@@ -4,7 +4,10 @@ export function getAdminNav(isSuperAdmin: boolean) {
     { href: "/admin/billing", label: "Billing" },
   ]
   if (!isSuperAdmin) {
-    items.push({ href: "/admin/students/import", label: "Import Students" })
+    items.push(
+      { href: "/admin/sms-logs", label: "SMS Logs" },
+      { href: "/admin/students/import", label: "Import Students" },
+    )
   }
   return items
 }
