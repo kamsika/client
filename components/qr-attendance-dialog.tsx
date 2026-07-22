@@ -181,7 +181,7 @@ export function QrAttendanceDialog({
         const normalized = parsed.registrationNo.toLowerCase()
         studentId =
           currentRecords.find(
-            (record) => record.student.registration_no.toLowerCase() === normalized,
+            (record) => record.student.registration_no?.toLowerCase() === normalized,
           )?.student.id ?? null
       }
 

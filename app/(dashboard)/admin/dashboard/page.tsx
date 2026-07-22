@@ -35,7 +35,7 @@ import type { Classroom, Institution, SmsLog, User } from "@/types"
 export default function AdminDashboardPage() {
   const user = getStoredUser<User>()
   const isSuperAdmin = user?.role === "super_admin"
-  const allowedRoles = isSuperAdmin ? ["super_admin"] : ["institution_admin"]
+  const allowedRoles = ["super_admin", "institution_admin"]
 
   const [institutions, setInstitutions] = useState<Institution[]>([])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])

@@ -7,8 +7,8 @@ import { LogOut, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
-import { getDashboardPath, getStoredUser } from "@/lib/api-client"
-import { logout } from "@/services/auth"
+import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { fetchCurrentUser, logout } from "@/services/auth"
 import type { User } from "@/types"
 
 interface DashboardShellProps {
@@ -25,12 +25,37 @@ export function DashboardShell({ children, navItems, title, allowedRoles }: Dash
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const stored = getStoredUser<User>()
-    if (!stored || !allowedRoles.includes(stored.role)) {
-      router.replace("/auth/login")
-      return
+    let cancelled = false
+
+    async function verifyAccess() {
+      const stored = getStoredUser<User>()
+      if (!stored) {
+        router.replace("/auth/login")
+        return
+      }
+
+      try {
+        const currentUser = await fetchCurrentUser()
+        if (cancelled) return
+
+        if (!allowedRoles.includes(currentUser.role)) {
+          router.replace(getDashboardPath(currentUser.role))
+          return
+        }
+
+        setUser(currentUser)
+      } catch {
+        if (cancelled) return
+        clearAuth()
+        router.replace("/auth/login")
+      }
     }
-    setUser(stored)
+
+    void verifyAccess()
+
+    return () => {
+      cancelled = true
+    }
   }, [allowedRoles, router])
 
   if (!user) {
@@ -90,16 +115,37 @@ export function useRequireAuth(allowedRoles: string[]) {
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const stored = getStoredUser<User>()
-    if (!stored) {
-      router.replace("/auth/login")
-      return
+    let cancelled = false
+
+    async function verifyAccess() {
+      const stored = getStoredUser<User>()
+      if (!stored) {
+        router.replace("/auth/login")
+        return
+      }
+
+      try {
+        const currentUser = await fetchCurrentUser()
+        if (cancelled) return
+
+        if (!allowedRoles.includes(currentUser.role)) {
+          router.replace(getDashboardPath(currentUser.role))
+          return
+        }
+
+        setUser(currentUser)
+      } catch {
+        if (cancelled) return
+        clearAuth()
+        router.replace("/auth/login")
+      }
     }
-    if (!allowedRoles.includes(stored.role)) {
-      router.replace(getDashboardPath(stored.role))
-      return
+
+    void verifyAccess()
+
+    return () => {
+      cancelled = true
     }
-    setUser(stored)
   }, [allowedRoles, router])
 
   return user

@@ -11,11 +11,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { login, redirectByRole } from "@/services/auth"
+import { getDashboardPath } from "@/lib/api-client"
+import { getApiErrorMessage } from "@/lib/api-errors"
+import { login } from "@/services/auth"
 
 const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
 })
 
 type FormData = z.infer<typeof schema>
@@ -29,11 +31,11 @@ export default function LoginPage() {
 
   async function onSubmit(values: FormData) {
     try {
-      const data = await login(values.email, values.password)
+      const data = await login(values.email.trim(), values.password)
       toast.success("Login successful")
-      redirectByRole(data.user.role)
-    } catch {
-      toast.error("Invalid credentials")
+      router.replace(getDashboardPath(data.user.role))
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Invalid email or password"))
     }
   }
 
@@ -48,11 +50,22 @@ export default function LoginPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...form.register("email")} />
+              <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
+              {form.formState.errors.email && (
+                <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" {...form.register("password")} />
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                {...form.register("password")}
+              />
+              {form.formState.errors.password && (
+                <p className="text-destructive text-sm">{form.formState.errors.password.message}</p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Signing in..." : "Sign In"}

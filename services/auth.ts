@@ -1,10 +1,19 @@
 import { apiClient, clearAuth, getDashboardPath, storeAuth } from "@/lib/api-client"
-import type { AuthResponse } from "@/types"
+import type { AuthResponse, User } from "@/types"
 
 export async function login(email: string, password: string) {
-  const { data } = await apiClient.post<AuthResponse>("/api/auth/login", { email, password })
+  const { data } = await apiClient.post<AuthResponse>("/api/auth/login", {
+    email: email.trim().toLowerCase(),
+    password,
+  })
   storeAuth(data.access_token, data.user)
   return data
+}
+
+export async function fetchCurrentUser() {
+  const { data } = await apiClient.get<{ user: User }>("/api/auth/me")
+  storeAuth(localStorage.getItem("access_token") || "", data.user)
+  return data.user
 }
 
 export function logout() {
