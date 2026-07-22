@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
+import { AdminStudentsSection } from "@/components/admin-students-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,7 +31,7 @@ import { createClassroom, listClassrooms } from "@/services/classroom"
 import { listInstitutions, updateInstitutionStatus } from "@/services/institution"
 import { listSmsLogs } from "@/services/sms-log"
 import { listStudents, listTeachers } from "@/services/student"
-import type { Classroom, Institution, SmsLog, User } from "@/types"
+import type { Classroom, Institution, SmsLog, Student, User } from "@/types"
 
 export default function AdminDashboardPage() {
   const user = getStoredUser<User>()
@@ -39,7 +40,8 @@ export default function AdminDashboardPage() {
 
   const [institutions, setInstitutions] = useState<Institution[]>([])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [students, setStudents] = useState<{ id: number; full_name: string | null; registration_no: string }[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+  const [loadingStudents, setLoadingStudents] = useState(true)
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
   const [open, setOpen] = useState(false)
@@ -66,6 +68,7 @@ export default function AdminDashboardPage() {
         setInstitutions(inst)
         return
       }
+      setLoadingStudents(true)
       const [cls, std, logs, tch] = await Promise.all([
         listClassrooms(),
         listStudents(),
@@ -78,6 +81,8 @@ export default function AdminDashboardPage() {
       setTeachers(tch)
     } catch {
       toast.error("Failed to load dashboard data")
+    } finally {
+      setLoadingStudents(false)
     }
   }
 
@@ -328,6 +333,10 @@ export default function AdminDashboardPage() {
               ))}
             </CardContent>
           </Card>
+        )}
+
+        {!isSuperAdmin && (
+          <AdminStudentsSection students={students} loading={loadingStudents} />
         )}
 
       </div>
