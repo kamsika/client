@@ -1,6 +1,19 @@
 import { apiClient } from "@/lib/api-client"
 import type { Student, User } from "@/types"
 
+export interface CreateStudentInput {
+  full_name: string
+  grade: string
+  section: string
+  gender: "Male" | "Female" | "Other"
+  contact: string
+}
+
+export async function createStudent(input: CreateStudentInput) {
+  const { data } = await apiClient.post<{ student: Student; message: string }>("/api/students", input)
+  return data
+}
+
 export async function listStudents() {
   const { data } = await apiClient.get<{ students: Student[] }>("/api/students")
   return data.students
@@ -22,7 +35,7 @@ export async function importStudents(file: File) {
   const { data } = await apiClient.post<{ created: string[]; errors: string[]; count: number }>(
     "/api/students/import",
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    { headers: { "Content-Type": "multipart/form-data" } },
   )
   return data
 }
