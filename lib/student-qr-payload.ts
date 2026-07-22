@@ -2,9 +2,8 @@ export function buildStudentQrPayload(registrationNo: string) {
   return JSON.stringify({ registration_no: registrationNo.trim() })
 }
 
-export function studentQrDownloadFilename(registrationNo: string) {
-  const safe = registrationNo.replace(/[^\w-]/g, "_")
-  return `${safe}_qr.png`
+export function studentQrDownloadFilename(studentId: string) {
+  return `${studentId.trim()}_qr.png`
 }
 
 export function studentInitials(fullName: string | null) {
