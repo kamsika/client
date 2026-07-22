@@ -34,6 +34,10 @@ export interface Student {
   registration_no: string
   full_name: string | null
   email: string | null
+  contact: string | null
+  grade: string | null
+  section: string | null
+  gender: string | null
   parent_name: string | null
   parent_phone: string | null
   has_face_descriptor?: boolean
