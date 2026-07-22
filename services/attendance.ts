@@ -1,6 +1,23 @@
 import { apiClient } from "@/lib/api-client"
 import type { Attendance, AttendanceRecord, Classroom } from "@/types"
 
+export async function markAttendanceByScan(
+  registrationNo: string,
+  classroomId: number,
+  scannedAt: string,
+) {
+  const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
+    "/api/attendance/mark",
+    {
+      registration_no: registrationNo,
+      classroom_id: classroomId,
+      status: "Present",
+      scanned_at: scannedAt,
+    },
+  )
+  return data
+}
+
 export async function markAttendance(studentId: number, classroomId: number, status?: string) {
   const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
     "/api/attendance/mark",
