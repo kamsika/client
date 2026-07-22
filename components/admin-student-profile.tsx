@@ -100,7 +100,7 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
             />
           </div>
 
-          <Button variant="outline" className="w-full" onClick={handleDownloadQrCode}>
+          <Button variant="outline" className="w-full text-black" onClick={handleDownloadQrCode}>
             Download QR Code 📥
           </Button>
         </div>
