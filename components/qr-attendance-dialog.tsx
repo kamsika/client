@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { parseStudentQr } from "@/lib/parse-student-qr"
-import { getClassroomAttendance, markAttendance } from "@/services/attendance"
+import { getScannedStudentId, parseStudentQr } from "@/lib/parse-student-qr"
+import { getClassroomAttendance, markAttendanceByScan } from "@/services/attendance"
 import type { AttendanceRecord } from "@/types"
 
 interface QrAttendanceDialogProps {
@@ -130,7 +130,7 @@ export function QrAttendanceDialog({
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [lastScan, setLastScan] = useState<string | null>(null)
-  const recentScansRef = useRef<Map<number, number>>(new Map())
+  const recentScansRef = useRef<Map<string, number>>(new Map())
 
   const loadStudents = useCallback(async () => {
     setLoadingStudents(true)
@@ -168,52 +168,45 @@ export function QrAttendanceDialog({
     async (rawValue: string) => {
       if (markingRef.current) return
 
-      const parsed = parseStudentQr(rawValue.trim())
-      if (!parsed) return
+      const trimmed = rawValue.trim()
+      const scannedData = getScannedStudentId(trimmed)
+      if (!scannedData) return
 
-      let studentId: number | null = null
-      const currentRecords = recordsRef.current
+      console.log("Scanned ID:", scannedData)
 
-      if (parsed.studentId) {
-        studentId =
-          currentRecords.find((record) => record.student.id === parsed.studentId)?.student.id ?? null
-      } else if (parsed.registrationNo) {
-        const normalized = parsed.registrationNo.toLowerCase()
-        studentId =
-          currentRecords.find(
-            (record) => record.student.registration_no?.toLowerCase() === normalized,
-          )?.student.id ?? null
+      const parsed = parseStudentQr(trimmed)
+      let registrationNo: string | null = parsed?.registrationNo ?? null
+
+      if (!registrationNo && parsed?.studentId) {
+        registrationNo =
+          recordsRef.current.find((record) => record.student.id === parsed.studentId)?.student
+            .registration_no ?? null
       }
 
-      if (!studentId) {
-        toast.error("QR code does not match a student in this classroom")
+      if (!registrationNo && scannedData) {
+        registrationNo = scannedData
+      }
+
+      if (!registrationNo) {
+        toast.error(`Student not found for scanned ID: ${scannedData}`)
         return
       }
 
       const now = Date.now()
-      const lastMarkedAt = recentScansRef.current.get(studentId)
+      const lastMarkedAt = recentScansRef.current.get(registrationNo)
       if (lastMarkedAt && now - lastMarkedAt < 3000) {
         return
       }
 
-      const student = currentRecords.find((record) => record.student.id === studentId)?.student
-      const label = student?.full_name || student?.registration_no || "Student"
-
       markingRef.current = true
       try {
-        const result = await markAttendance(studentId, classroomId)
-        recentScansRef.current.set(studentId, now)
-        setLastScan(label)
-        toast.success(
-          result.attendance.status === "Late"
-            ? `${label} marked late (${result.delta_minutes} min) — parent SMS triggered`
-            : result.attendance.status === "Absent"
-              ? `${label} marked absent — parent SMS triggered`
-              : `${label} marked ${result.attendance.status}`,
-        )
+        await markAttendanceByScan(registrationNo, classroomId, new Date().toISOString())
+        recentScansRef.current.set(registrationNo, now)
+        setLastScan(registrationNo)
+        toast.success(`Attendance marked as Present for ${registrationNo}!`)
         await loadStudents()
       } catch {
-        toast.error(`Failed to mark attendance for ${label}`)
+        toast.error(`Failed to mark attendance for ${registrationNo}`)
       } finally {
         markingRef.current = false
       }
