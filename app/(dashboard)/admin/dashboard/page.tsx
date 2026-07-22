@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
+import { AdminAddStudentForm } from "@/components/admin-add-student-form"
 import { AdminStudentsSection } from "@/components/admin-students-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -336,7 +337,13 @@ export default function AdminDashboardPage() {
         )}
 
         {!isSuperAdmin && (
-          <AdminStudentsSection students={students} loading={loadingStudents} />
+          <>
+            <AdminAddStudentForm
+              existingStudents={students}
+              onStudentAdded={(student) => setStudents((current) => [...current, student])}
+            />
+            <AdminStudentsSection students={students} loading={loadingStudents} />
+          </>
         )}
 
       </div>
