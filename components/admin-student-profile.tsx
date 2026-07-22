@@ -1,18 +1,16 @@
 "use client"
 
-import { useRef } from "react"
+import { useCallback, useRef } from "react"
 import { QRCodeCanvas } from "qrcode.react"
 import { Download } from "lucide-react"
 import { toast } from "sonner"
 
-import { StudentQrCode } from "@/components/student-qr-code"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
   buildStudentQrPayload,
   studentInitials,
-  studentQrDownloadFilename,
 } from "@/lib/student-qr-payload"
 import type { Student } from "@/types"
 
@@ -26,24 +24,30 @@ function displayContact(student: Student) {
 
 export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qrContainerRef = useRef<HTMLDivElement>(null)
 
-  function handleDownload() {
-    const canvas = canvasRef.current
-    if (!canvas) {
+  const studentId = student.registration_no
+
+  const handleDownloadQrCode = useCallback(() => {
+    const canvas = canvasRef.current ?? qrContainerRef.current?.querySelector("canvas")
+    if (!(canvas instanceof HTMLCanvasElement)) {
       toast.error("QR code is not ready to download")
       return
     }
 
     try {
+      const pngUrl = canvas.toDataURL("image/png")
       const link = document.createElement("a")
-      link.href = canvas.toDataURL("image/png")
-      link.download = studentQrDownloadFilename(student.registration_no)
+      link.href = pngUrl
+      link.download = `${studentId}_qr.png`
+      document.body.appendChild(link)
       link.click()
+      document.body.removeChild(link)
       toast.success("QR code downloaded")
     } catch {
       toast.error("Failed to download QR code")
     }
-  }
+  }, [studentId])
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_auto]">
@@ -86,24 +90,27 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
 
       <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-4">
         <p className="text-sm font-medium">Student QR Code</p>
-        <StudentQrCode registrationNo={student.registration_no} size={180} />
+
+        <div ref={qrContainerRef} className="flex flex-col items-center gap-3">
+          <div className="rounded-md bg-white p-2">
+            <QRCodeCanvas
+              ref={canvasRef}
+              value={buildStudentQrPayload(studentId)}
+              size={180}
+              level="M"
+              aria-label={`QR code for student ${studentId}`}
+            />
+          </div>
+
+          <Button variant="outline" className="w-full" onClick={handleDownloadQrCode}>
+            <Download className="size-4" />
+            Download QR Code
+          </Button>
+        </div>
+
         <p className="text-muted-foreground max-w-[220px] text-center text-xs">
-          Based on student ID <span className="font-mono">{student.registration_no}</span>
+          Based on student ID <span className="font-mono">{studentId}</span>
         </p>
-
-        <QRCodeCanvas
-          ref={canvasRef}
-          value={buildStudentQrPayload(student.registration_no)}
-          size={360}
-          level="M"
-          className="hidden"
-          aria-hidden
-        />
-
-        <Button variant="outline" className="w-full" onClick={handleDownload}>
-          <Download className="size-4" />
-          Download QR
-        </Button>
       </div>
     </div>
   )
