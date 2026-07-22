@@ -3,6 +3,14 @@ export interface ParsedStudentQr {
   registrationNo?: string
 }
 
+export function getScannedStudentId(rawValue: string): string | null {
+  const parsed = parseStudentQr(rawValue)
+  if (!parsed) return null
+  if (parsed.registrationNo) return parsed.registrationNo
+  if (parsed.studentId !== undefined) return String(parsed.studentId)
+  return rawValue.trim() || null
+}
+
 export function parseStudentQr(rawValue: string): ParsedStudentQr | null {
   const value = rawValue.trim()
   if (!value) return null
