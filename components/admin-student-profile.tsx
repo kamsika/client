@@ -2,7 +2,6 @@
 
 import { useCallback, useRef } from "react"
 import { QRCodeCanvas } from "qrcode.react"
-import { Download } from "lucide-react"
 import { toast } from "sonner"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -23,14 +22,13 @@ function displayContact(student: Student) {
 }
 
 export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const qrContainerRef = useRef<HTMLDivElement>(null)
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
 
   const studentId = student.registration_no
 
   const handleDownloadQrCode = useCallback(() => {
-    const canvas = canvasRef.current ?? qrContainerRef.current?.querySelector("canvas")
-    if (!(canvas instanceof HTMLCanvasElement)) {
+    const canvas = qrCanvasRef.current
+    if (!canvas) {
       toast.error("QR code is not ready to download")
       return
     }
@@ -91,10 +89,10 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
       <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-4">
         <p className="text-sm font-medium">Student QR Code</p>
 
-        <div ref={qrContainerRef} className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-3">
           <div className="rounded-md bg-white p-2">
             <QRCodeCanvas
-              ref={canvasRef}
+              ref={qrCanvasRef}
               value={buildStudentQrPayload(studentId)}
               size={180}
               level="M"
@@ -103,8 +101,7 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
           </div>
 
           <Button variant="outline" className="w-full" onClick={handleDownloadQrCode}>
-            <Download className="size-4" />
-            Download QR Code
+            Download QR Code 📥
           </Button>
         </div>
 
