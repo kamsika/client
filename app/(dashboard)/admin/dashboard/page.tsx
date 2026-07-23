@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,9 +28,13 @@ import {
 } from "@/components/ui/select"
 import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
-import { registerInstitution } from "@/services/auth"
 import { createClassroom, listClassrooms } from "@/services/classroom"
-import { listInstitutions, updateInstitutionStatus } from "@/services/institution"
+import {
+  createInstitution,
+  listInstitutions,
+  updateInstitutionStatus,
+  type InstitutionAdminCredentials,
+} from "@/services/institution"
 import { listSmsLogs } from "@/services/sms-log"
 import { listStudents, listTeachers } from "@/services/student"
 import type { Classroom, Institution, SmsLog, Student, User } from "@/types"
@@ -53,10 +58,11 @@ export default function AdminDashboardPage() {
     subdomain: "",
     admin_name: "",
     admin_email: "",
-    admin_password: "",
     admin_phone: "",
   })
   const [creatingInstitution, setCreatingInstitution] = useState(false)
+  const [createdCredentials, setCreatedCredentials] = useState<InstitutionAdminCredentials | null>(null)
+  const [credentialsOpen, setCredentialsOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -164,9 +170,9 @@ export default function AdminDashboardPage() {
   }
 
   async function handleCreateInstitution() {
-    const { name, subdomain, admin_name, admin_email, admin_password } = institutionForm
-    if (!name || !subdomain || !admin_name || !admin_email || !admin_password) {
-      toast.error("Fill all required institution fields")
+    const { name, subdomain, admin_name, admin_email, admin_phone } = institutionForm
+    if (!name || !subdomain) {
+      toast.error("Institution name and subdomain are required")
       return
     }
     if (!/^[a-z0-9-]+$/.test(subdomain)) {
@@ -175,29 +181,49 @@ export default function AdminDashboardPage() {
     }
     setCreatingInstitution(true)
     try {
-      await registerInstitution({
+      const result = await createInstitution({
         name,
         subdomain,
-        admin_name,
-        admin_email,
-        admin_password,
-        admin_phone: institutionForm.admin_phone || undefined,
+        admin_name: admin_name || undefined,
+        admin_email: admin_email || undefined,
+        admin_phone: admin_phone || undefined,
       })
-      toast.success("Institution created successfully")
+      toast.success("Institution and admin account created")
       setInstitutionOpen(false)
       setInstitutionForm({
         name: "",
         subdomain: "",
         admin_name: "",
         admin_email: "",
-        admin_password: "",
         admin_phone: "",
       })
+      setCreatedCredentials(result.admin_credentials)
+      setCredentialsOpen(true)
       loadData()
     } catch {
       toast.error("Failed to create institution. Subdomain or email may already exist.")
     } finally {
       setCreatingInstitution(false)
+    }
+  }
+
+  async function copyCredentials() {
+    if (!createdCredentials) {
+      return
+    }
+
+    const text = [
+      `Login email: ${createdCredentials.email}`,
+      `Password: ${createdCredentials.password}`,
+      `Role: Institution Admin`,
+      `Institution ID: ${createdCredentials.institution_id}`,
+    ].join("\n")
+
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success("Credentials copied to clipboard")
+    } catch {
+      toast.error("Failed to copy credentials")
     }
   }
 
@@ -228,7 +254,47 @@ export default function AdminDashboardPage() {
         )}
 
         {isSuperAdmin && (
-          <Card>
+          <>
+            <Dialog open={credentialsOpen} onOpenChange={setCredentialsOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Institution Admin Login</DialogTitle>
+                  <DialogDescription>
+                    Share these credentials with the tuition center owner. The password is shown only
+                    once.
+                  </DialogDescription>
+                </DialogHeader>
+                {createdCredentials && (
+                  <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Email</p>
+                      <p className="font-mono font-medium">{createdCredentials.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Password</p>
+                      <p className="font-mono font-medium">{createdCredentials.password}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Name</p>
+                      <p>{createdCredentials.full_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Role</p>
+                      <p>Institution Admin</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Institution ID</p>
+                      <p className="font-mono">{createdCredentials.institution_id}</p>
+                    </div>
+                  </div>
+                )}
+                <Button type="button" className="w-full" onClick={() => void copyCredentials()}>
+                  Copy Credentials
+                </Button>
+              </DialogContent>
+            </Dialog>
+
+            <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Institutions</CardTitle>
@@ -259,16 +325,18 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Admin Full Name</Label>
+                      <Label>Admin Full Name (optional)</Label>
                       <Input
+                        placeholder="Defaults to '[Institution Name] Admin'"
                         value={institutionForm.admin_name}
                         onChange={(e) => setInstitutionForm({ ...institutionForm, admin_name: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Admin Email</Label>
+                      <Label>Admin Email (optional)</Label>
                       <Input
                         type="email"
+                        placeholder="Auto-generated if left blank"
                         value={institutionForm.admin_email}
                         onChange={(e) => setInstitutionForm({ ...institutionForm, admin_email: e.target.value })}
                       />
@@ -280,14 +348,10 @@ export default function AdminDashboardPage() {
                         onChange={(e) => setInstitutionForm({ ...institutionForm, admin_phone: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label>Admin Password</Label>
-                      <Input
-                        type="password"
-                        value={institutionForm.admin_password}
-                        onChange={(e) => setInstitutionForm({ ...institutionForm, admin_password: e.target.value })}
-                      />
-                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      A default institution admin account is created automatically. Login credentials
+                      are generated and shown after creation.
+                    </p>
                     <Button onClick={handleCreateInstitution} disabled={creatingInstitution}>
                       {creatingInstitution ? "Creating..." : "Create Institution"}
                     </Button>
@@ -319,6 +383,7 @@ export default function AdminDashboardPage() {
               ))}
             </CardContent>
           </Card>
+          </>
         )}
 
         {!isSuperAdmin && (
