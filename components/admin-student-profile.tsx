@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 
 import { StudentQrCode } from "@/components/student-qr-code"
@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { downloadStudentQrCanvas, printStudentQrCanvas } from "@/lib/download-qr-image"
-import { studentInitials } from "@/lib/student-qr-payload"
+import { buildStudentQrPayload, studentInitials } from "@/lib/student-qr-payload"
 import type { Student } from "@/types"
 
 interface AdminStudentProfileProps {
@@ -19,9 +19,25 @@ function displayContact(student: Student) {
   return student.contact || student.email || "—"
 }
 
+function studentQrLabel(student: Student) {
+  const name = student.full_name?.trim() || "Unnamed student"
+  return `${name} (${student.registration_no})`
+}
+
 export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
-  const studentId = student.registration_no
+  // Prefer registration_no as the scannable student ID (unique per center).
+  const qrPayload = buildStudentQrPayload(student.registration_no)
+  const label = studentQrLabel(student)
+
+  useEffect(() => {
+    console.log("[QR] Profile QR for", {
+      dbId: student.id,
+      name: student.full_name,
+      registrationNo: student.registration_no,
+      payload: qrPayload,
+    })
+  }, [student.id, student.full_name, student.registration_no, qrPayload])
 
   const handleDownloadQrCode = useCallback(() => {
     const canvas = qrCanvasRef.current
@@ -31,12 +47,12 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
     }
 
     try {
-      downloadStudentQrCanvas(canvas, studentId)
-      toast.success("QR code downloaded")
+      downloadStudentQrCanvas(canvas, qrPayload)
+      toast.success(`Downloaded QR for ${label}`)
     } catch {
       toast.error("Failed to download QR code")
     }
-  }, [studentId])
+  }, [label, qrPayload])
 
   const handlePrintQrCode = useCallback(() => {
     const canvas = qrCanvasRef.current
@@ -46,11 +62,11 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
     }
 
     try {
-      printStudentQrCanvas(canvas, studentId)
+      printStudentQrCanvas(canvas, qrPayload)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to print QR code")
     }
-  }, [studentId])
+  }, [qrPayload])
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_auto]">
@@ -62,6 +78,7 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
           <div>
             <h3 className="text-lg font-semibold">{student.full_name || "Unnamed student"}</h3>
             <p className="text-muted-foreground text-sm">Student ID: {student.registration_no}</p>
+            <p className="text-muted-foreground text-xs">Record #{student.id}</p>
           </div>
         </div>
 
@@ -71,6 +88,10 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
           <div className="grid grid-cols-[120px_1fr] gap-2">
             <dt className="text-muted-foreground">Name</dt>
             <dd>{student.full_name || "—"}</dd>
+          </div>
+          <div className="grid grid-cols-[120px_1fr] gap-2">
+            <dt className="text-muted-foreground">Student ID</dt>
+            <dd className="font-mono">{student.registration_no}</dd>
           </div>
           <div className="grid grid-cols-[120px_1fr] gap-2">
             <dt className="text-muted-foreground">Grade</dt>
@@ -94,7 +115,13 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
       <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-5 text-black">
         <p className="text-sm font-medium">Student QR Code</p>
 
-        <StudentQrCode ref={qrCanvasRef} studentId={studentId} />
+        <StudentQrCode
+          key={`profile-qr-${student.id}-${qrPayload}`}
+          ref={qrCanvasRef}
+          studentDbId={student.id}
+          studentId={qrPayload}
+          label={label}
+        />
 
         <div className="flex w-full max-w-[280px] flex-col gap-2">
           <Button variant="outline" className="w-full text-black" onClick={handleDownloadQrCode}>
@@ -104,11 +131,6 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
             Print QR Code
           </Button>
         </div>
-
-        <p className="max-w-[280px] text-center text-xs text-neutral-600">
-          Encodes plain ID <span className="font-mono font-semibold">{studentId}</span> for easy
-          camera scanning.
-        </p>
       </div>
     </div>
   )
