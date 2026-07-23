@@ -2,14 +2,15 @@ import { apiClient } from "@/lib/api-client"
 import type { Attendance, AttendanceRecord, Classroom } from "@/types"
 
 export async function markAttendanceByScan(
-  registrationNo: string,
+  scannedStudentId: string,
   classroomId: number,
   scannedAt: string,
 ) {
+  console.log("Sending student ID to API:", scannedStudentId)
   const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
     "/api/attendance/mark",
     {
-      registration_no: registrationNo,
+      student_id: scannedStudentId,
       classroom_id: classroomId,
       status: "Present",
       scanned_at: scannedAt,
@@ -19,15 +20,14 @@ export async function markAttendanceByScan(
 }
 
 export async function scanCenterAttendance(payload: {
-  registrationNo?: string
-  studentId?: number
+  scannedStudentId: string
   classroomId?: number
 }) {
+  console.log("Sending student ID to API:", payload.scannedStudentId)
   const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
     "/api/attendance/scan",
     {
-      registration_no: payload.registrationNo,
-      student_id: payload.studentId,
+      student_id: payload.scannedStudentId,
       classroom_id: payload.classroomId,
       status: "Present",
       scanned_at: new Date().toISOString(),
