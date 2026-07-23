@@ -16,7 +16,12 @@ import { getApiErrorMessage } from "@/lib/api-errors"
 import { login } from "@/services/auth"
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  // Allow generated admin emails (including uncommon TLDs) while still requiring @domain.
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "Enter a valid email address"),
   password: z.string().min(1, "Password is required"),
 })
 
@@ -50,7 +55,7 @@ export default function LoginPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
+              <Input id="email" type="text" inputMode="email" autoComplete="email" {...form.register("email")} />
               {form.formState.errors.email && (
                 <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>
               )}
