@@ -1,6 +1,6 @@
 "use client"
 
-import { Html5Qrcode } from "html5-qrcode"
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Camera, QrCode, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
@@ -82,7 +82,13 @@ async function startQrScanner(
 ): Promise<Html5Qrcode> {
   const scanConfig = {
     fps: 10,
-    qrbox: { width: 240, height: 240 },
+    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+      const size = Math.max(180, Math.min(250, Math.floor(minEdge * 0.75)))
+      return { width: size, height: size }
+    },
+    aspectRatio: 1.777778,
+    disableFlip: false,
   }
   const onFailure = () => {}
 
@@ -109,9 +115,21 @@ async function startQrScanner(
   let lastError: unknown = null
 
   for (const cameraIdOrConfig of cameraAttempts) {
-    const scanner = new Html5Qrcode(elementId, { verbose: false })
+    const scanner = new Html5Qrcode(elementId, {
+      verbose: false,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      useBarCodeDetectorIfSupported: true,
+    })
     try {
-      await scanner.start(cameraIdOrConfig, scanConfig, onScan, onFailure)
+      await scanner.start(
+        cameraIdOrConfig,
+        scanConfig,
+        (decodedText) => {
+          console.log("🎯 Raw Scanned Text:", decodedText)
+          onScan(decodedText)
+        },
+        onFailure,
+      )
       return scanner
     } catch (error) {
       lastError = error
@@ -375,11 +393,25 @@ export function QrAttendanceDialog({
           <div className="relative min-h-[280px] overflow-hidden rounded-lg border bg-black">
             <div
               id={readerId}
-              className="min-h-[280px] w-full [&_video]:max-h-[320px] [&_video]:w-full [&_video]:object-cover"
+              className="min-h-[280px] w-full [&_img]:hidden [&_video]:max-h-[320px] [&_video]:w-full [&_video]:object-cover"
             />
 
+            {cameraActive && !cameraStarting && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+                <div
+                  className="relative rounded-md border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                  style={{ width: 250, height: 250 }}
+                >
+                  <div className="absolute -top-0.5 -left-0.5 size-6 border-t-4 border-l-4 border-emerald-400" />
+                  <div className="absolute -top-0.5 -right-0.5 size-6 border-t-4 border-r-4 border-emerald-400" />
+                  <div className="absolute -bottom-0.5 -left-0.5 size-6 border-b-4 border-l-4 border-emerald-400" />
+                  <div className="absolute -right-0.5 -bottom-0.5 size-6 border-r-4 border-b-4 border-emerald-400" />
+                </div>
+              </div>
+            )}
+
             {!cameraActive && (
-              <div className="absolute inset-0 flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
+              <div className="absolute inset-0 z-20 flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
                 <p>
                   {loadingStudents || !studentsReady
                     ? "Loading students..."
@@ -397,7 +429,7 @@ export function QrAttendanceDialog({
             )}
 
             {cameraActive && cameraStarting && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-sm text-white/80">
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 text-sm text-white/80">
                 Switching camera...
               </div>
             )}
