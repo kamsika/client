@@ -1,13 +1,13 @@
 "use client"
 
-import { Html5Qrcode } from "html5-qrcode"
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Camera, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { getScannedStudentId, parseStudentQr } from "@/lib/parse-student-qr"
+import { parseStudentQr } from "@/lib/parse-student-qr"
 import { scanCenterAttendance } from "@/services/attendance"
 import type { Attendance } from "@/types"
 
@@ -17,6 +17,8 @@ interface TeacherLiveQrScannerProps {
   classroomId?: number
   onMarked?: (attendance: Attendance) => void
 }
+
+const SCAN_BOX_SIZE = 250
 
 function getCameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
@@ -38,15 +40,26 @@ function getCameraErrorMessage(error: unknown): string {
   return message || "Unable to access the camera."
 }
 
+function buildScanConfig() {
+  return {
+    fps: 10,
+    // Keep the scan region within the actual video frame (prevents silent scan failures).
+    qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+      const size = Math.max(180, Math.min(SCAN_BOX_SIZE, Math.floor(minEdge * 0.75)))
+      return { width: size, height: size }
+    },
+    aspectRatio: 1.777778,
+    disableFlip: false,
+  }
+}
+
 async function startQrScanner(
   elementId: string,
   facingMode: FacingMode,
-  onScan: (value: string) => void,
+  onScanSuccess: (decodedText: string) => void,
 ): Promise<Html5Qrcode> {
-  const scanConfig = {
-    fps: 10,
-    qrbox: { width: 240, height: 240 },
-  }
+  const scanConfig = buildScanConfig()
   const attempts: Array<string | MediaTrackConstraints> =
     facingMode === "environment"
       ? [{ facingMode: { exact: "environment" } }, { facingMode: "environment" }]
@@ -59,9 +72,26 @@ async function startQrScanner(
 
   let lastError: unknown = null
   for (const cameraIdOrConfig of attempts) {
-    const scanner = new Html5Qrcode(elementId, { verbose: false })
+    const scanner = new Html5Qrcode(elementId, {
+      verbose: false,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      useBarCodeDetectorIfSupported: true,
+    })
     try {
-      await scanner.start(cameraIdOrConfig, scanConfig, onScan, () => {})
+      await scanner.start(
+        cameraIdOrConfig,
+        scanConfig,
+        (decodedText) => {
+          console.log("🎯 Raw Scanned Text:", decodedText)
+          onScanSuccess(decodedText)
+        },
+        (errorMessage) => {
+          // Continuous "not found" frames are expected; log sparsely for debugging.
+          if (Math.random() < 0.01) {
+            console.debug("[QR] scan frame:", errorMessage)
+          }
+        },
+      )
       return scanner
     } catch (error) {
       lastError = error
@@ -82,6 +112,7 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const markingRef = useRef(false)
   const recentScansRef = useRef<Map<string, number>>(new Map())
+  const processScanRef = useRef<(value: string) => void>(() => {})
 
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
@@ -108,29 +139,43 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
 
   const processScan = useCallback(
     async (rawValue: string) => {
+      console.log("🎯 Raw Scanned Text:", rawValue)
+
       if (markingRef.current) return
 
       const trimmed = rawValue.trim()
-      const scannedData = getScannedStudentId(trimmed)
-      if (!scannedData) return
+      if (!trimmed) return
 
       const parsed = parseStudentQr(trimmed)
-      const registrationNo = parsed?.registrationNo || scannedData
-      if (!registrationNo) return
+      console.log("[QR] Parsed payload:", parsed)
 
+      const registrationNo = parsed?.registrationNo
+      const studentId = parsed?.studentId
+
+      if (!registrationNo && !studentId) {
+        toast.error("QR code did not contain a recognizable student ID")
+        return
+      }
+
+      const dedupeKey = registrationNo || `id:${studentId}`
       const now = Date.now()
-      const lastMarkedAt = recentScansRef.current.get(registrationNo)
+      const lastMarkedAt = recentScansRef.current.get(dedupeKey)
       if (lastMarkedAt && now - lastMarkedAt < 3000) return
 
       markingRef.current = true
       try {
-        const result = await scanCenterAttendance(registrationNo, classroomId)
-        recentScansRef.current.set(registrationNo, now)
-        setLastScan(registrationNo)
-        toast.success(`Marked present: ${registrationNo}`)
+        const result = await scanCenterAttendance({
+          registrationNo,
+          studentId,
+          classroomId,
+        })
+        recentScansRef.current.set(dedupeKey, now)
+        const label = registrationNo || `Student #${studentId}`
+        setLastScan(label)
+        toast.success(`Marked present: ${label}`)
         onMarked?.(result.attendance)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, `Failed to mark ${registrationNo}`))
+        toast.error(getApiErrorMessage(error, "Failed to mark attendance from QR scan"))
       } finally {
         markingRef.current = false
       }
@@ -138,17 +183,27 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
     [classroomId, onMarked],
   )
 
+  // Keep the Html5Qrcode callback stable across re-renders.
+  useEffect(() => {
+    processScanRef.current = (value: string) => {
+      void processScan(value)
+    }
+  }, [processScan])
+
   const startScanner = useCallback(
     async (mode: FacingMode) => {
       await stopScanner()
-      const scanner = await startQrScanner(readerId, mode, (value) => {
-        void processScan(value)
+      // Let the reader element remount/clear before restarting.
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
+      const scanner = await startQrScanner(readerId, mode, (decodedText) => {
+        processScanRef.current(decodedText)
       })
       scannerRef.current = scanner
       setFacingMode(mode)
       setCameraActive(true)
     },
-    [processScan, stopScanner],
+    [stopScanner],
   )
 
   useEffect(() => {
@@ -198,15 +253,31 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
 
   return (
     <div className="space-y-3">
-      <div className="relative min-h-[280px] overflow-hidden rounded-lg border bg-black">
+      <div className="relative min-h-[320px] overflow-hidden rounded-lg border bg-black">
         <div
           id={readerId}
-          className="min-h-[280px] w-full [&_video]:max-h-[320px] [&_video]:w-full [&_video]:object-cover"
+          className="min-h-[320px] w-full [&_img]:hidden [&_video]:max-h-[360px] [&_video]:w-full [&_video]:object-cover"
         />
 
+        {/* Visible alignment guide for the user */}
+        {cameraActive && !cameraStarting && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div
+              className="relative rounded-md border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+              style={{ width: SCAN_BOX_SIZE, height: SCAN_BOX_SIZE }}
+            >
+              <div className="absolute -top-0.5 -left-0.5 size-6 border-t-4 border-l-4 border-emerald-400" />
+              <div className="absolute -top-0.5 -right-0.5 size-6 border-t-4 border-r-4 border-emerald-400" />
+              <div className="absolute -bottom-0.5 -left-0.5 size-6 border-b-4 border-l-4 border-emerald-400" />
+              <div className="absolute -right-0.5 -bottom-0.5 size-6 border-r-4 border-b-4 border-emerald-400" />
+            </div>
+          </div>
+        )}
+
         {!cameraActive && (
-          <div className="absolute inset-0 flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
+          <div className="absolute inset-0 z-20 flex min-h-[320px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
             <p>Allow camera access to start live QR attendance scanning.</p>
+            <p className="text-white/60 text-xs">Align the student QR code inside the square frame.</p>
             <Button type="button" onClick={() => void handleEnableCamera()} disabled={cameraStarting}>
               <Camera className="size-4" />
               {cameraStarting ? "Starting camera..." : "Start Live Scanner"}
@@ -215,23 +286,28 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
         )}
 
         {cameraActive && cameraStarting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-sm text-white/80">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 text-sm text-white/80">
             Switching camera...
           </div>
         )}
       </div>
 
       {cameraActive && (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => void handleSwitchCamera()}
-          disabled={cameraStarting}
-        >
-          <SwitchCamera className="size-4" />
-          Switch Camera
-        </Button>
+        <>
+          <p className="text-muted-foreground text-center text-xs">
+            Hold the QR code steady inside the green square until it scans.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => void handleSwitchCamera()}
+            disabled={cameraStarting}
+          >
+            <SwitchCamera className="size-4" />
+            Switch Camera
+          </Button>
+        </>
       )}
 
       {cameraError && <p className="text-destructive text-sm">{cameraError}</p>}
