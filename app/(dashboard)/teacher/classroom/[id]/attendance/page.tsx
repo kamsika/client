@@ -35,10 +35,32 @@ export default function ClassroomAttendancePage() {
   }, [classroomId])
 
   useEffect(() => {
-    loadAttendance()
-    const interval = setInterval(loadAttendance, 5000)
-    return () => clearInterval(interval)
-  }, [loadAttendance])
+    let cancelled = false
+
+    const refreshAttendance = async () => {
+      try {
+        const data = await getClassroomAttendance(classroomId)
+        if (cancelled) return
+        setClassroom(data.classroom)
+        setRecords(data.records)
+        setDate(data.date)
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load attendance")
+        }
+      }
+    }
+
+    void refreshAttendance()
+    const interval = setInterval(() => {
+      void refreshAttendance()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [classroomId])
 
   async function handleMark(studentId: number, status?: string) {
     setLoadingId(studentId)
