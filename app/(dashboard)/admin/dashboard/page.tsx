@@ -5,6 +5,7 @@ import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
 import { AdminAddStudentForm } from "@/components/admin-add-student-form"
+import { AdminStaffSection } from "@/components/admin-staff-section"
 import { AdminStudentsSection } from "@/components/admin-students-section"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -387,64 +388,70 @@ export default function AdminDashboardPage() {
         )}
 
         {!isSuperAdmin && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Classrooms</CardTitle>
-                <CardDescription>Create and manage scheduled classes</CardDescription>
-              </div>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger render={<Button />}>Create Classroom</DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>New Classroom</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Name</Label>
-                      <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Schedule Start Time</Label>
-                      <Input
-                        type="time"
-                        value={form.schedule_start_time}
-                        onChange={(e) => setForm({ ...form, schedule_start_time: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Teacher</Label>
-                      <Select value={form.teacher_id} onValueChange={(v) => v && setForm({ ...form, teacher_id: v })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select teacher" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {teachers.map((t) => (
-                            <SelectItem key={t.id} value={String(t.id)}>
-                              {t.full_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleCreateClassroom}>Create</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {classrooms.map((cls) => (
-                <div key={cls.id} className="flex items-center justify-between rounded-lg border p-4">
-                  <div>
-                    <p className="font-medium">{cls.name}</p>
-                    <p className="text-muted-foreground text-sm">
-                      Starts at {cls.schedule_start_time} · {cls.teacher_name}
-                    </p>
-                  </div>
+          <>
+            <AdminStaffSection
+              teachers={teachers}
+              onTeacherCreated={(teacher) => setTeachers((current) => [...current, teacher])}
+            />
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Classrooms</CardTitle>
+                  <CardDescription>Create and manage scheduled classes</CardDescription>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger render={<Button />}>Create Classroom</DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>New Classroom</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Schedule Start Time</Label>
+                        <Input
+                          type="time"
+                          value={form.schedule_start_time}
+                          onChange={(e) => setForm({ ...form, schedule_start_time: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Teacher</Label>
+                        <Select value={form.teacher_id} onValueChange={(v) => v && setForm({ ...form, teacher_id: v })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select teacher" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teachers.map((t) => (
+                              <SelectItem key={t.id} value={String(t.id)}>
+                                {t.full_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleCreateClassroom}>Create</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {classrooms.map((cls) => (
+                  <div key={cls.id} className="flex items-center justify-between rounded-lg border p-4">
+                    <div>
+                      <p className="font-medium">{cls.name}</p>
+                      <p className="text-muted-foreground text-sm">
+                        Starts at {cls.schedule_start_time} · {cls.teacher_name}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {!isSuperAdmin && (
