@@ -18,12 +18,17 @@ export async function markAttendanceByScan(
   return data
 }
 
-export async function scanCenterAttendance(registrationNo: string, classroomId?: number) {
+export async function scanCenterAttendance(payload: {
+  registrationNo?: string
+  studentId?: number
+  classroomId?: number
+}) {
   const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
     "/api/attendance/scan",
     {
-      registration_no: registrationNo,
-      classroom_id: classroomId,
+      registration_no: payload.registrationNo,
+      student_id: payload.studentId,
+      classroom_id: payload.classroomId,
       status: "Present",
       scanned_at: new Date().toISOString(),
     },
