@@ -38,7 +38,9 @@ export default function LoginPage() {
     try {
       const data = await login(values.email.trim(), values.password)
       toast.success("Login successful")
-      router.replace(getDashboardPath(data.user.role))
+      // Role-based redirect: teachers go to /teacher/dashboard
+      const destination = getDashboardPath(data.user.role)
+      router.replace(destination)
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Invalid email or password"))
     }
