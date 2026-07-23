@@ -1,16 +1,14 @@
 "use client"
 
 import { useCallback, useRef } from "react"
-import { QRCodeCanvas } from "qrcode.react"
 import { toast } from "sonner"
 
+import { StudentQrCode } from "@/components/student-qr-code"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import {
-  buildStudentQrPayload,
-  studentInitials,
-} from "@/lib/student-qr-payload"
+import { downloadStudentQrCanvas, printStudentQrCanvas } from "@/lib/download-qr-image"
+import { studentInitials } from "@/lib/student-qr-payload"
 import type { Student } from "@/types"
 
 interface AdminStudentProfileProps {
@@ -23,7 +21,6 @@ function displayContact(student: Student) {
 
 export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
-
   const studentId = student.registration_no
 
   const handleDownloadQrCode = useCallback(() => {
@@ -34,16 +31,24 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
     }
 
     try {
-      const pngUrl = canvas.toDataURL("image/png")
-      const link = document.createElement("a")
-      link.href = pngUrl
-      link.download = `${studentId}_qr.png`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      downloadStudentQrCanvas(canvas, studentId)
       toast.success("QR code downloaded")
     } catch {
       toast.error("Failed to download QR code")
+    }
+  }, [studentId])
+
+  const handlePrintQrCode = useCallback(() => {
+    const canvas = qrCanvasRef.current
+    if (!canvas) {
+      toast.error("QR code is not ready to print")
+      return
+    }
+
+    try {
+      printStudentQrCanvas(canvas, studentId)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to print QR code")
     }
   }, [studentId])
 
@@ -86,27 +91,23 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
         </dl>
       </div>
 
-      <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-4">
+      <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-5 text-black">
         <p className="text-sm font-medium">Student QR Code</p>
 
-        <div className="flex flex-col items-center gap-3">
-          <div className="rounded-md bg-white p-2">
-            <QRCodeCanvas
-              ref={qrCanvasRef}
-              value={buildStudentQrPayload(studentId)}
-              size={180}
-              level="M"
-              aria-label={`QR code for student ${studentId}`}
-            />
-          </div>
+        <StudentQrCode ref={qrCanvasRef} studentId={studentId} />
 
+        <div className="flex w-full max-w-[280px] flex-col gap-2">
           <Button variant="outline" className="w-full text-black" onClick={handleDownloadQrCode}>
-            Download QR Code 📥
+            Download QR Code
+          </Button>
+          <Button variant="secondary" className="w-full" onClick={handlePrintQrCode}>
+            Print QR Code
           </Button>
         </div>
 
-        <p className="text-muted-foreground max-w-[220px] text-center text-xs">
-          Based on student ID <span className="font-mono">{studentId}</span>
+        <p className="max-w-[280px] text-center text-xs text-neutral-600">
+          Encodes plain ID <span className="font-mono font-semibold">{studentId}</span> for easy
+          camera scanning.
         </p>
       </div>
     </div>
