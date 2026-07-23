@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
@@ -59,10 +59,56 @@ export default function AdminDashboardPage() {
   const [creatingInstitution, setCreatingInstitution] = useState(false)
 
   useEffect(() => {
-    loadData()
-  }, [])
+    let cancelled = false
 
-  async function loadData() {
+    async function fetchDashboard() {
+      try {
+        if (isSuperAdmin) {
+          const inst = await listInstitutions()
+          if (!cancelled) {
+            setInstitutions(inst)
+          }
+          return
+        }
+
+        if (!cancelled) {
+          setLoadingStudents(true)
+        }
+
+        const [cls, std, logs, tch] = await Promise.all([
+          listClassrooms(),
+          listStudents(),
+          listSmsLogs(),
+          listTeachers().catch(() => []),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        setClassrooms(cls)
+        setStudents(std)
+        setSmsLogs(logs)
+        setTeachers(tch)
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load dashboard data")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingStudents(false)
+        }
+      }
+    }
+
+    void fetchDashboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isSuperAdmin])
+
+  const loadData = useCallback(async () => {
     try {
       if (isSuperAdmin) {
         const inst = await listInstitutions()
@@ -85,7 +131,7 @@ export default function AdminDashboardPage() {
     } finally {
       setLoadingStudents(false)
     }
-  }
+  }, [isSuperAdmin])
 
   async function handleCreateClassroom() {
     if (!form.name || !form.teacher_id) {
