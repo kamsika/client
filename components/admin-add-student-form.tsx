@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getNextStudentId } from "@/lib/generate-student-id"
+import { findDuplicateStudent, getNextStudentId } from "@/lib/generate-student-id"
 import { buildStudentQrPayload } from "@/lib/student-qr-payload"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { createStudent } from "@/services/student"
@@ -41,6 +41,7 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
   const [savedStudent, setSavedStudent] = useState<Student | null>(null)
+  const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null)
 
   const previewStudentId = useMemo(
     () => getNextStudentId(existingStudents),
@@ -72,9 +73,19 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setDuplicateMessage(null)
 
     if (!form.name.trim() || !form.grade.trim() || !form.section.trim() || !form.gender || !form.contact.trim()) {
       toast.error("Please fill in all fields")
+      return
+    }
+
+    const duplicate = findDuplicateStudent(existingStudents, form.name, form.contact)
+    if (duplicate) {
+      const message = "Student already exists!"
+      setDuplicateMessage(message)
+      toast.error(message)
+      window.alert(message)
       return
     }
 
@@ -92,7 +103,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
       onStudentAdded(result.student)
       toast.success(result.message || `Student ${result.student.registration_no} created successfully!`)
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create student"))
+      const message = getApiErrorMessage(error, "Failed to create student")
+      if (message.includes("Student already exists")) {
+        setDuplicateMessage("Student already exists!")
+        window.alert("Student already exists!")
+      }
+      toast.error(message)
     } finally {
       setSubmitting(false)
     }
@@ -100,6 +116,7 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
 
   function handleAddAnother() {
     setSavedStudent(null)
+    setDuplicateMessage(null)
     setForm(emptyForm)
   }
 
@@ -173,6 +190,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {duplicateMessage && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {duplicateMessage}
+          </div>
+        )}
+
         <form onSubmit={(event) => void handleSubmit(event)} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="student-name">Name</Label>
