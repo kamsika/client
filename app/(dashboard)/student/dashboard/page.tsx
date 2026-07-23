@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
@@ -23,11 +23,7 @@ export default function StudentDashboardPage() {
   })
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [session, data] = await Promise.all([getActiveSession(), getStudyAnalytics(14)])
       setActiveSession(session)
@@ -35,7 +31,32 @@ export default function StudentDashboardPage() {
     } catch {
       toast.error("Failed to load dashboard")
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function fetchDashboard() {
+      try {
+        const [session, data] = await Promise.all([getActiveSession(), getStudyAnalytics(14)])
+        if (cancelled) {
+          return
+        }
+        setActiveSession(session)
+        setAnalytics(data)
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load dashboard")
+        }
+      }
+    }
+
+    void fetchDashboard()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleToggle() {
     setLoading(true)
