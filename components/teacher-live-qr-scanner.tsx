@@ -7,7 +7,6 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { parseStudentQr } from "@/lib/parse-student-qr"
 import { scanCenterAttendance } from "@/services/attendance"
 import type { Attendance } from "@/types"
 
@@ -143,39 +142,34 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
 
       if (markingRef.current) return
 
-      const trimmed = rawValue.trim()
-      if (!trimmed) return
+      // Use the exact scanned QR text — do not substitute another student's ID.
+      const scannedId = rawValue.trim()
+      if (!scannedId) return
 
-      const parsed = parseStudentQr(trimmed)
-      console.log("[QR] Parsed payload:", parsed)
+      console.log("Sending student ID to API:", scannedId)
 
-      const registrationNo = parsed?.registrationNo
-      const studentId = parsed?.studentId
-
-      if (!registrationNo && !studentId) {
-        toast.error("QR code did not contain a recognizable student ID")
-        return
-      }
-
-      const dedupeKey = registrationNo || `id:${studentId}`
       const now = Date.now()
-      const lastMarkedAt = recentScansRef.current.get(dedupeKey)
+      const lastMarkedAt = recentScansRef.current.get(scannedId)
       if (lastMarkedAt && now - lastMarkedAt < 3000) return
 
       markingRef.current = true
       try {
         const result = await scanCenterAttendance({
-          registrationNo,
-          studentId,
+          scannedStudentId: scannedId,
           classroomId,
         })
-        recentScansRef.current.set(dedupeKey, now)
-        const label = registrationNo || `Student #${studentId}`
-        setLastScan(label)
-        toast.success(`Marked present: ${label}`)
+        recentScansRef.current.set(scannedId, now)
+        const labeled =
+          result.attendance.registration_no ||
+          result.attendance.student_name ||
+          scannedId
+        setLastScan(`${labeled} ← scanned ${scannedId}`)
+        toast.success(
+          `Marked present: ${result.attendance.student_name || "Student"} (${result.attendance.registration_no || scannedId})`,
+        )
         onMarked?.(result.attendance)
       } catch (error) {
-        toast.error(getApiErrorMessage(error, "Failed to mark attendance from QR scan"))
+        toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
       } finally {
         markingRef.current = false
       }
