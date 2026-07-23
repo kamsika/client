@@ -168,7 +168,13 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
 
           <div className="flex flex-col items-center gap-3 rounded-lg border bg-white p-5 text-black">
             <p className="text-sm font-medium">Generated QR Code</p>
-            <StudentQrCode ref={qrCanvasRef} studentId={studentId} />
+            <StudentQrCode
+              key={`created-qr-${savedStudent.id}-${studentId}`}
+              ref={qrCanvasRef}
+              studentDbId={savedStudent.id}
+              studentId={studentId}
+              label={`${savedStudent.full_name || "Student"} (${studentId})`}
+            />
             <div className="flex w-full max-w-[280px] flex-col gap-2">
               <Button variant="outline" className="w-full text-black" onClick={handleDownloadQrCode}>
                 Download QR Code
@@ -177,10 +183,6 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
                 Print QR Code
               </Button>
             </div>
-            <p className="max-w-[280px] text-center text-xs text-neutral-600">
-              Encodes plain ID <span className="font-mono font-semibold">{studentId}</span> for easy
-              camera scanning.
-            </p>
           </div>
 
           <Button variant="secondary" onClick={handleAddAnother}>
