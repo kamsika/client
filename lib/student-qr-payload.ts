@@ -1,5 +1,15 @@
-export function buildStudentQrPayload(registrationNo: string) {
-  return JSON.stringify({ registration_no: registrationNo.trim() })
+/** Minimum on-screen QR size for reliable camera scanning. */
+export const STUDENT_QR_SIZE = 280
+
+/** Quiet-zone modules around the QR (white border). */
+export const STUDENT_QR_MARGIN_MODULES = 4
+
+/**
+ * QR payload must stay simple for reliable mobile scanning.
+ * Stores ONLY the plain student ID / registration string (e.g. "STU-2026-001").
+ */
+export function buildStudentQrPayload(studentId: string) {
+  return studentId.trim()
 }
 
 export function studentQrDownloadFilename(studentId: string) {
