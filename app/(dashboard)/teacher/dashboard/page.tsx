@@ -1,87 +1,233 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { useEffect, useState } from "react"
-import { QrCode, ScanFace } from "lucide-react"
 import { toast } from "sonner"
 
 import { DashboardShell } from "@/components/dashboard-shell"
-import { FaceAttendanceDialog } from "@/components/face-attendance-dialog"
-import { QrAttendanceDialog } from "@/components/qr-attendance-dialog"
+import { TeacherLiveQrScanner } from "@/components/teacher-live-qr-scanner"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { getStoredUser } from "@/lib/api-client"
+import { getTodayCenterAttendance } from "@/services/attendance"
 import { listClassrooms } from "@/services/classroom"
-import type { Classroom } from "@/types"
+import type { Attendance, Classroom, User } from "@/types"
 
 const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
 
+function formatArrivalTime(value: string | null) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+}
+
 export default function TeacherDashboardPage() {
+  const user = getStoredUser<User>()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [qrClassroom, setQrClassroom] = useState<Classroom | null>(null)
-  const [faceClassroom, setFaceClassroom] = useState<Classroom | null>(null)
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>("")
+  const [todayRecords, setTodayRecords] = useState<Attendance[]>([])
+  const [todayDate, setTodayDate] = useState<string>("")
+  const [loadingToday, setLoadingToday] = useState(true)
+
+  const loadToday = useCallback(async () => {
+    try {
+      const data = await getTodayCenterAttendance()
+      setTodayRecords(data.records)
+      setTodayDate(data.date)
+    } catch {
+      toast.error("Failed to load today's attendance")
+    } finally {
+      setLoadingToday(false)
+    }
+  }, [])
 
   useEffect(() => {
     listClassrooms()
-      .then(setClassrooms)
+      .then((items) => {
+        setClassrooms(items)
+        if (items.length > 0) {
+          setSelectedClassroomId(String(items[0].id))
+        }
+      })
       .catch(() => toast.error("Failed to load classrooms"))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function refresh() {
+      try {
+        const data = await getTodayCenterAttendance()
+        if (!cancelled) {
+          setTodayRecords(data.records)
+          setTodayDate(data.date)
+          setLoadingToday(false)
+        }
+      } catch {
+        if (!cancelled) {
+          setLoadingToday(false)
+        }
+      }
+    }
+
+    void refresh()
+    const interval = setInterval(() => {
+      void refresh()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   return (
     <DashboardShell title="Teacher Dashboard" navItems={teacherNav} allowedRoles={["teacher"]}>
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Classrooms</CardTitle>
-          <CardDescription>Select a classroom to mark real-time attendance</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          {classrooms.map((cls) => (
-            <div key={cls.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-              <div>
-                <p className="font-medium">{cls.name}</p>
-                <p className="text-muted-foreground text-sm">Starts at {cls.schedule_start_time}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={() => setFaceClassroom(cls)}>
-                  <ScanFace className="size-4" />
-                  Face Attendance
-                </Button>
-                <Button variant="outline" onClick={() => setQrClassroom(cls)}>
-                  <QrCode className="size-4" />
-                  Scan QR for Attendance
-                </Button>
-                <Link href={`/teacher/classroom/${cls.id}/attendance`}>
-                  <Button>Mark Attendance</Button>
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Welcome{user?.full_name ? `, ${user.full_name}` : ""}</CardTitle>
+            <CardDescription>
+              Scan student QR codes for your center
+              {user?.institution_id ? ` (center #${user.institution_id})` : ""}. Attendance is
+              limited to students in your assigned center.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Live QR Scanner</CardTitle>
+              <CardDescription>
+                Point the camera at a student QR code to mark attendance automatically.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {classrooms.length > 1 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Classroom</p>
+                  <Select
+                    value={selectedClassroomId}
+                    onValueChange={(value) => value && setSelectedClassroomId(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select classroom" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classrooms.map((cls) => (
+                        <SelectItem key={cls.id} value={String(cls.id)}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {classrooms.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No classroom assigned yet. Ask your center admin to create a classroom and assign
+                  you as teacher.
+                </p>
+              ) : (
+                <TeacherLiveQrScanner
+                  classroomId={selectedClassroomId ? Number(selectedClassroomId) : undefined}
+                  onMarked={(attendance) => {
+                    setTodayRecords((current) => {
+                      const without = current.filter(
+                        (item) =>
+                          !(
+                            item.student_id === attendance.student_id &&
+                            item.classroom_id === attendance.classroom_id &&
+                            item.date === attendance.date
+                          ),
+                      )
+                      return [attendance, ...without]
+                    })
+                    void loadToday()
+                  }}
+                />
+              )}
+
+              {classrooms.length > 0 && selectedClassroomId && (
+                <Link href={`/teacher/classroom/${selectedClassroomId}/attendance`}>
+                  <Button variant="outline" className="w-full">
+                    Open Manual Attendance
+                  </Button>
                 </Link>
-              </div>
-            </div>
-          ))}
-          {classrooms.length === 0 && (
-            <p className="text-muted-foreground text-sm">No classrooms assigned yet.</p>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
 
-      {faceClassroom && (
-        <FaceAttendanceDialog
-          classroomId={faceClassroom.id}
-          classroomName={faceClassroom.name}
-          open={Boolean(faceClassroom)}
-          onOpenChange={(open) => {
-            if (!open) setFaceClassroom(null)
-          }}
-        />
-      )}
-
-      {qrClassroom && (
-        <QrAttendanceDialog
-          classroomId={qrClassroom.id}
-          classroomName={qrClassroom.name}
-          open={Boolean(qrClassroom)}
-          onOpenChange={(open) => {
-            if (!open) setQrClassroom(null)
-          }}
-        />
-      )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Today&apos;s Attendance</CardTitle>
+              <CardDescription>
+                Students scanned today
+                {todayDate ? ` · ${todayDate}` : ""} · {todayRecords.length} marked
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingToday ? (
+                <p className="text-muted-foreground text-sm">Loading attendance...</p>
+              ) : todayRecords.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No students scanned yet today. Use the live QR scanner to begin.
+                </p>
+              ) : (
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Student</TableHead>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {todayRecords.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell className="font-medium">
+                            {record.student_name || "Student"}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs">
+                            {record.registration_no || "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={record.status === "Late" ? "destructive" : "default"}>
+                              {record.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatArrivalTime(record.arrival_time)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </DashboardShell>
   )
 }
