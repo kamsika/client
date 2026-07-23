@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { getScannedStudentId, parseStudentQr } from "@/lib/parse-student-qr"
 import { getClassroomAttendance, markAttendanceByScan } from "@/services/attendance"
 import type { AttendanceRecord } from "@/types"
 
@@ -203,45 +202,31 @@ export function QrAttendanceDialog({
     async (rawValue: string) => {
       if (markingRef.current) return
 
-      const trimmed = rawValue.trim()
-      const scannedData = getScannedStudentId(trimmed)
-      if (!scannedData) return
+      // Exact scanned QR text — never substitute another student's ID.
+      const scannedId = rawValue.trim()
+      if (!scannedId) return
 
-      console.log("Scanned ID:", scannedData)
-
-      const parsed = parseStudentQr(trimmed)
-      let registrationNo: string | null = parsed?.registrationNo ?? null
-
-      if (!registrationNo && parsed?.studentId) {
-        registrationNo =
-          recordsRef.current.find((record) => record.student.id === parsed.studentId)?.student
-            .registration_no ?? null
-      }
-
-      if (!registrationNo && scannedData) {
-        registrationNo = scannedData
-      }
-
-      if (!registrationNo) {
-        toast.error(`Student not found for scanned ID: ${scannedData}`)
-        return
-      }
+      console.log("🎯 Raw Scanned Text:", scannedId)
+      console.log("Sending student ID to API:", scannedId)
 
       const now = Date.now()
-      const lastMarkedAt = recentScansRef.current.get(registrationNo)
+      const lastMarkedAt = recentScansRef.current.get(scannedId)
       if (lastMarkedAt && now - lastMarkedAt < 3000) {
         return
       }
 
       markingRef.current = true
       try {
-        await markAttendanceByScan(registrationNo, classroomId, new Date().toISOString())
-        recentScansRef.current.set(registrationNo, now)
-        setLastScan(registrationNo)
-        toast.success(`Attendance marked as Present for ${registrationNo}!`)
+        const result = await markAttendanceByScan(scannedId, classroomId, new Date().toISOString())
+        recentScansRef.current.set(scannedId, now)
+        const labeled = result.attendance.registration_no || scannedId
+        setLastScan(`${result.attendance.student_name || "Student"} (${labeled})`)
+        toast.success(
+          `Attendance marked as Present for ${result.attendance.student_name || "Student"} (${labeled})!`,
+        )
         await loadStudents()
       } catch {
-        toast.error(`Failed to mark attendance for ${registrationNo}`)
+        toast.error(`Failed to mark attendance for ${scannedId}`)
       } finally {
         markingRef.current = false
       }
