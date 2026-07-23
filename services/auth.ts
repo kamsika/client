@@ -43,7 +43,8 @@ export async function registerUser(payload: {
   password: string
   full_name: string
   phone_number?: string
+  institution_id?: number
 }) {
-  const { data } = await apiClient.post("/api/auth/register", payload)
+  const { data } = await apiClient.post<{ user: User }>("/api/auth/register", payload)
   return data
 }
