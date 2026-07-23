@@ -18,10 +18,33 @@ export async function markAttendanceByScan(
   return data
 }
 
+export async function scanCenterAttendance(registrationNo: string, classroomId?: number) {
+  const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
+    "/api/attendance/scan",
+    {
+      registration_no: registrationNo,
+      classroom_id: classroomId,
+      status: "Present",
+      scanned_at: new Date().toISOString(),
+    },
+  )
+  return data
+}
+
+export async function getTodayCenterAttendance() {
+  const { data } = await apiClient.get<{
+    date: string
+    institution_id: number
+    count: number
+    records: Attendance[]
+  }>("/api/attendance/today")
+  return data
+}
+
 export async function markAttendance(studentId: number, classroomId: number, status?: string) {
   const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
     "/api/attendance/mark",
-    { student_id: studentId, classroom_id: classroomId, status }
+    { student_id: studentId, classroom_id: classroomId, status },
   )
   return data
 }
@@ -37,7 +60,7 @@ export async function getClassroomAttendance(classroomId: number) {
 
 export async function getStudentAttendance(studentId: number) {
   const { data } = await apiClient.get<{ student: unknown; attendance: Attendance[] }>(
-    `/api/attendance/student/${studentId}`
+    `/api/attendance/student/${studentId}`,
   )
   return data
 }
