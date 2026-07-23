@@ -139,9 +139,9 @@ export function QrAttendanceDialog({
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const recordsRef = useRef<AttendanceRecord[]>([])
   const markingRef = useRef(false)
-  const processScanRef = useRef<(value: string) => void>(() => {})
 
   const [loadingStudents, setLoadingStudents] = useState(false)
+  const [studentsReady, setStudentsReady] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
@@ -231,10 +231,6 @@ export function QrAttendanceDialog({
     [classroomId, loadStudents],
   )
 
-  processScanRef.current = (value: string) => {
-    void processScan(value)
-  }
-
   const startScanner = useCallback(
     async (facingMode: FacingMode) => {
       await stopScanner()
@@ -242,30 +238,61 @@ export function QrAttendanceDialog({
       const scanner = await startQrScanner(
         readerId,
         { facingMode },
-        (value) => processScanRef.current(value),
+        (value) => {
+          void processScan(value)
+        },
       )
 
       scannerRef.current = scanner
       setActiveFacingMode(facingMode)
       setCameraActive(true)
     },
-    [readerId, stopScanner],
+    [readerId, stopScanner, processScan],
   )
+
+  const resetDialogState = useCallback(() => {
+    setLastScan(null)
+    setCameraActive(false)
+    setCameraStarting(false)
+    setCameraError(null)
+    setActiveFacingMode("environment")
+    setStudentsReady(false)
+    recentScansRef.current.clear()
+    void stopScanner()
+  }, [stopScanner])
 
   useEffect(() => {
     if (!open) {
-      setLastScan(null)
-      setCameraActive(false)
-      setCameraStarting(false)
-      setCameraError(null)
-      setActiveFacingMode("environment")
-      recentScansRef.current.clear()
-      void stopScanner()
       return
     }
 
-    loadStudents()
-  }, [open, loadStudents, stopScanner])
+    let cancelled = false
+
+    void (async () => {
+      try {
+        const data = await getClassroomAttendance(classroomId)
+        if (!cancelled) {
+          recordsRef.current = data.records
+          setStudentsReady(true)
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load students for this classroom")
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, classroomId])
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      resetDialogState()
+    }
+    onOpenChange(nextOpen)
+  }
 
   async function handleEnableCamera() {
     setCameraError(null)
@@ -331,7 +358,7 @@ export function QrAttendanceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -354,14 +381,14 @@ export function QrAttendanceDialog({
             {!cameraActive && (
               <div className="absolute inset-0 flex min-h-[280px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
                 <p>
-                  {loadingStudents
+                  {loadingStudents || !studentsReady
                     ? "Loading students..."
                     : "Your browser will ask to use the camera. Click Allow when prompted."}
                 </p>
                 <Button
                   type="button"
                   onClick={() => void handleEnableCamera()}
-                  disabled={loadingStudents || cameraStarting}
+                  disabled={loadingStudents || !studentsReady || cameraStarting}
                 >
                   <Camera className="size-4" />
                   {cameraStarting ? "Starting camera..." : "Allow Camera Access"}
