@@ -76,29 +76,71 @@ export function FaceAttendanceDialog({
     }
   }, [])
 
-  const stopCamera = useCallback(() => {
+  const stopCameraTracks = useCallback(() => {
     if (videoRef.current) {
       stopFaceCamera(videoRef.current)
     }
-    setCameraActive(false)
   }, [])
+
+  const resetDialogState = useCallback(() => {
+    stopCameraTracks()
+    setCameraActive(false)
+    setMode("mark")
+    setCameraError(null)
+    setLastMatch(null)
+    setEnrollStudentId("")
+    recentMarksRef.current.clear()
+  }, [stopCameraTracks])
 
   useEffect(() => {
     if (!open) {
-      stopCamera()
-      setMode("mark")
-      setCameraError(null)
-      setLastMatch(null)
-      setEnrollStudentId("")
-      recentMarksRef.current.clear()
       return
     }
 
-    loadProfiles()
-    loadFaceModels()
-      .then(() => setModelsReady(true))
-      .catch(() => toast.error("Failed to load face recognition models"))
-  }, [open, loadProfiles, stopCamera])
+    let cancelled = false
+
+    async function initializeDialog() {
+      try {
+        setLoadingProfiles(true)
+        const data = await listFaceProfiles()
+        if (!cancelled) {
+          setProfiles(data)
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load student face profiles")
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProfiles(false)
+        }
+      }
+
+      try {
+        await loadFaceModels()
+        if (!cancelled) {
+          setModelsReady(true)
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load face recognition models")
+        }
+      }
+    }
+
+    void initializeDialog()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
+      resetDialogState()
+    }
+    onOpenChange(nextOpen)
+  }
 
   async function handleEnableCamera() {
     setCameraError(null)
@@ -123,7 +165,8 @@ export function FaceAttendanceDialog({
       await startFaceCamera(videoRef.current)
       setCameraActive(true)
     } catch (error) {
-      stopCamera()
+      stopCameraTracks()
+      setCameraActive(false)
       const message = getCameraErrorMessage(error)
       setCameraError(message)
       toast.error(message)
@@ -236,7 +279,7 @@ export function FaceAttendanceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
