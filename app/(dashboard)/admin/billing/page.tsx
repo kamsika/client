@@ -43,17 +43,32 @@ export default function AdminBillingPage() {
   }, [isSuperAdmin, selectedInstitutionId])
 
   useEffect(() => {
-    if (selectedInstitutionId) loadData(selectedInstitutionId)
-  }, [selectedInstitutionId])
-
-  async function loadData(institutionId: number) {
-    try {
-      const [billingData] = await Promise.all([getBilling(institutionId)])
-      setBilling(billingData)
-    } catch {
-      toast.error("Failed to load billing data")
+    if (!selectedInstitutionId) {
+      return
     }
-  }
+
+    const institutionId = selectedInstitutionId
+    let cancelled = false
+
+    async function fetchBilling() {
+      try {
+        const billingData = await getBilling(institutionId)
+        if (!cancelled) {
+          setBilling(billingData)
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error("Failed to load billing data")
+        }
+      }
+    }
+
+    void fetchBilling()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedInstitutionId])
 
   const billingColumns: ColumnDef<BillingRecord>[] = [
     { accessorKey: "billing_period", header: "Period" },
