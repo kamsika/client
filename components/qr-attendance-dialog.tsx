@@ -2,7 +2,7 @@
 
 import { Html5Qrcode } from "html5-qrcode"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Camera, QrCode } from "lucide-react"
+import { Camera, QrCode, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -73,8 +73,11 @@ async function getCameraPermissionState(): Promise<PermissionState | "unknown"> 
   }
 }
 
+type FacingMode = "environment" | "user"
+
 async function startQrScanner(
   elementId: string,
+  cameraConfig: string | MediaTrackConstraints,
   onScan: (value: string) => void,
 ): Promise<Html5Qrcode> {
   const scanConfig = {
@@ -83,13 +86,25 @@ async function startQrScanner(
   }
   const onFailure = () => {}
 
-  const cameraAttempts: Array<string | MediaTrackConstraints> = [{}, { facingMode: "user" }]
+  const cameraAttempts: Array<string | MediaTrackConstraints> = []
+
+  if (typeof cameraConfig === "object" && cameraConfig.facingMode === "environment") {
+    cameraAttempts.push(
+      { facingMode: { exact: "environment" } },
+      { facingMode: "environment" },
+    )
+  } else if (typeof cameraConfig === "object" && cameraConfig.facingMode === "user") {
+    cameraAttempts.push({ facingMode: "user" })
+  } else {
+    cameraAttempts.push(cameraConfig)
+  }
 
   const cameras = await Html5Qrcode.getCameras().catch(() => [] as { id: string; label: string }[])
   for (const camera of cameras) {
-    cameraAttempts.push(camera.id)
+    if (!cameraAttempts.includes(camera.id)) {
+      cameraAttempts.push(camera.id)
+    }
   }
-  cameraAttempts.push({ facingMode: "user" })
 
   let lastError: unknown = null
 
@@ -124,12 +139,14 @@ export function QrAttendanceDialog({
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const recordsRef = useRef<AttendanceRecord[]>([])
   const markingRef = useRef(false)
+  const processScanRef = useRef<(value: string) => void>(() => {})
 
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [lastScan, setLastScan] = useState<string | null>(null)
+  const [activeFacingMode, setActiveFacingMode] = useState<FacingMode>("environment")
   const recentScansRef = useRef<Map<string, number>>(new Map())
 
   const loadStudents = useCallback(async () => {
@@ -214,12 +231,34 @@ export function QrAttendanceDialog({
     [classroomId, loadStudents],
   )
 
+  processScanRef.current = (value: string) => {
+    void processScan(value)
+  }
+
+  const startScanner = useCallback(
+    async (facingMode: FacingMode) => {
+      await stopScanner()
+
+      const scanner = await startQrScanner(
+        readerId,
+        { facingMode },
+        (value) => processScanRef.current(value),
+      )
+
+      scannerRef.current = scanner
+      setActiveFacingMode(facingMode)
+      setCameraActive(true)
+    },
+    [readerId, stopScanner],
+  )
+
   useEffect(() => {
     if (!open) {
       setLastScan(null)
       setCameraActive(false)
       setCameraStarting(false)
       setCameraError(null)
+      setActiveFacingMode("environment")
       recentScansRef.current.clear()
       void stopScanner()
       return
@@ -257,14 +296,30 @@ export function QrAttendanceDialog({
     setCameraStarting(true)
 
     try {
-      await stopScanner()
+      await startScanner("environment")
+    } catch (error) {
+      setCameraActive(false)
+      const message = getCameraErrorMessage(error)
+      setCameraError(message)
+      toast.error(message)
+    } finally {
+      setCameraStarting(false)
+    }
+  }
 
-      const scanner = await startQrScanner(readerId, (value) => {
-        void processScan(value)
-      })
+  async function handleSwitchCamera() {
+    if (cameraStarting) {
+      return
+    }
 
-      scannerRef.current = scanner
-      setCameraActive(true)
+    const nextFacingMode: FacingMode =
+      activeFacingMode === "environment" ? "user" : "environment"
+
+    setCameraError(null)
+    setCameraStarting(true)
+
+    try {
+      await startScanner(nextFacingMode)
     } catch (error) {
       setCameraActive(false)
       const message = getCameraErrorMessage(error)
@@ -316,10 +371,23 @@ export function QrAttendanceDialog({
 
             {cameraActive && cameraStarting && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-sm text-white/80">
-                Starting camera...
+                Switching camera...
               </div>
             )}
           </div>
+
+          {cameraActive && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => void handleSwitchCamera()}
+              disabled={cameraStarting}
+            >
+              <SwitchCamera className="size-4" />
+              Switch Camera
+            </Button>
+          )}
 
           {cameraError && (
             <div className="space-y-2 text-center">
