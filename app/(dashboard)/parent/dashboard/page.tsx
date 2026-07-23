@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { formatLocalDateTime } from "@/lib/format-time"
 import { getStudentAttendance } from "@/services/attendance"
 import { getMyChildren } from "@/services/student"
 import type { Attendance, Student } from "@/types"
@@ -47,8 +48,7 @@ export default function ParentDashboardPage() {
     {
       accessorKey: "arrival_time",
       header: "Arrival Time",
-      cell: ({ row }) =>
-        row.original.arrival_time ? new Date(row.original.arrival_time).toLocaleString() : "-",
+      cell: ({ row }) => formatLocalDateTime(row.original.arrival_time),
     },
   ]
 
