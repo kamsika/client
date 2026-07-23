@@ -25,18 +25,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getStoredUser } from "@/lib/api-client"
+import { formatLocalTime } from "@/lib/format-time"
 import { getTodayCenterAttendance } from "@/services/attendance"
 import { listClassrooms } from "@/services/classroom"
 import type { Attendance, Classroom, User } from "@/types"
 
 const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
-
-function formatArrivalTime(value: string | null) {
-  if (!value) return "—"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-}
 
 export default function TeacherDashboardPage() {
   const user = getStoredUser<User>()
@@ -217,7 +211,7 @@ export default function TeacherDashboardPage() {
                               {record.status}
                             </Badge>
                           </TableCell>
-                          <TableCell>{formatArrivalTime(record.arrival_time)}</TableCell>
+                          <TableCell>{formatLocalTime(record.arrival_time)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
