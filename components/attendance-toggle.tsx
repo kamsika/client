@@ -3,6 +3,7 @@
 import { Check, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { formatLocalTime } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import type { Attendance } from "@/types"
 
@@ -29,7 +30,7 @@ export function AttendanceToggle({
         <p className="font-medium">{studentName}</p>
         {attendance?.arrival_time && (
           <p className="text-muted-foreground text-sm">
-            Arrived: {new Date(attendance.arrival_time).toLocaleTimeString()}
+            Arrived: {formatLocalTime(attendance.arrival_time)}
           </p>
         )}
       </div>
