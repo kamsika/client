@@ -12,6 +12,7 @@ interface AttendanceToggleProps {
   studentName: string
   attendance: Attendance | null
   loading?: boolean
+  disabled?: boolean
   onMark: (studentId: number, status?: string) => Promise<void>
 }
 
@@ -20,9 +21,11 @@ export function AttendanceToggle({
   studentName,
   attendance,
   loading,
+  disabled,
   onMark,
 }: AttendanceToggleProps) {
   const status = attendance?.status
+  const actionsDisabled = Boolean(loading || disabled)
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
@@ -38,7 +41,7 @@ export function AttendanceToggle({
         <Button
           size="sm"
           variant={status === "Present" ? "default" : "outline"}
-          disabled={loading}
+          disabled={actionsDisabled}
           onClick={() => onMark(studentId, "Present")}
           className={cn(status === "Present" && "bg-green-600 hover:bg-green-700")}
         >
@@ -48,7 +51,7 @@ export function AttendanceToggle({
         <Button
           size="sm"
           variant={status === "Absent" ? "default" : "outline"}
-          disabled={loading}
+          disabled={actionsDisabled}
           onClick={() => onMark(studentId, "Absent")}
           className={cn(status === "Absent" && "bg-red-600 hover:bg-red-700")}
         >
