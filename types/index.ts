@@ -47,6 +47,10 @@ export interface Attendance {
   id: number
   student_id: number
   classroom_id: number
+  class_id?: number
+  center_id?: number | null
+  institution_id?: number | null
+  classroom_name?: string | null
   date: string
   arrival_time: string | null
   status: "Present" | "Absent" | "Late"
