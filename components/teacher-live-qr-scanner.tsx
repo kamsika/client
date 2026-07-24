@@ -53,6 +53,65 @@ function buildScanConfig() {
   }
 }
 
+/** Stop every MediaStream track under a reader root and detach the video. */
+function releaseCameraMedia(root: ParentNode | null | undefined) {
+  if (!root) return
+
+  const videos = root.querySelectorAll("video")
+  videos.forEach((video) => {
+    const stream = video.srcObject
+    if (stream instanceof MediaStream) {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop()
+        } catch {
+          // already ended
+        }
+      })
+    }
+    try {
+      video.pause()
+    } catch {
+      // ignore
+    }
+    video.srcObject = null
+    video.removeAttribute("src")
+    try {
+      video.load()
+    } catch {
+      // ignore
+    }
+  })
+}
+
+async function destroyQrScanner(scanner: Html5Qrcode | null, readerElementId: string) {
+  const container =
+    typeof document !== "undefined" ? document.getElementById(readerElementId) : null
+
+  // Release tracks first so the LED turns off even if library stop() is slow/hangs.
+  releaseCameraMedia(container)
+
+  if (scanner) {
+    try {
+      if (scanner.isScanning) {
+        await scanner.stop()
+      }
+    } catch {
+      // already stopped / element gone
+    }
+    try {
+      scanner.clear()
+    } catch {
+      // clear() throws if the element was already removed
+    }
+  }
+
+  // Second pass after html5-qrcode cleanup (covers leftover tracks).
+  releaseCameraMedia(
+    typeof document !== "undefined" ? document.getElementById(readerElementId) : container,
+  )
+}
+
 async function startQrScanner(
   elementId: string,
   facingMode: FacingMode,
@@ -94,12 +153,7 @@ async function startQrScanner(
       return scanner
     } catch (error) {
       lastError = error
-      try {
-        if (scanner.isScanning) await scanner.stop()
-        scanner.clear()
-      } catch {
-        // ignore cleanup errors
-      }
+      await destroyQrScanner(scanner, elementId)
     }
   }
 
@@ -122,19 +176,9 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
     scannerRef.current = null
-    if (!scanner) return
-    try {
-      if (scanner.isScanning) await scanner.stop()
-    } catch {
-      // already stopped
-    } finally {
-      try {
-        scanner.clear()
-      } catch {
-        // ignore
-      }
-    }
-  }, [])
+    await destroyQrScanner(scanner, readerId)
+    setCameraActive(false)
+  }, [readerId])
 
   const processScan = useCallback(
     async (rawValue: string) => {
@@ -202,9 +246,14 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
 
   useEffect(() => {
     return () => {
-      void stopScanner()
+      // Sync track stop in cleanup so unmount/navigation always kills the LED.
+      const scanner = scannerRef.current
+      scannerRef.current = null
+      const container = document.getElementById(readerId)
+      releaseCameraMedia(container)
+      void destroyQrScanner(scanner, readerId)
     }
-  }, [stopScanner])
+  }, [readerId])
 
   async function handleEnableCamera() {
     setCameraError(null)
@@ -240,6 +289,17 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
       const message = getCameraErrorMessage(error)
       setCameraError(message)
       toast.error(message)
+    } finally {
+      setCameraStarting(false)
+    }
+  }
+
+  async function handleStopCamera() {
+    if (cameraStarting) return
+    setCameraStarting(true)
+    try {
+      await stopScanner()
+      setCameraError(null)
     } finally {
       setCameraStarting(false)
     }
@@ -291,16 +351,27 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           <p className="text-muted-foreground text-center text-xs">
             Hold the QR code steady inside the green square until it scans.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => void handleSwitchCamera()}
-            disabled={cameraStarting}
-          >
-            <SwitchCamera className="size-4" />
-            Switch Camera
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => void handleSwitchCamera()}
+              disabled={cameraStarting}
+            >
+              <SwitchCamera className="size-4" />
+              Switch Camera
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => void handleStopCamera()}
+              disabled={cameraStarting}
+            >
+              Stop Scanner
+            </Button>
+          </div>
         </>
       )}
 
