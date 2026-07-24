@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { getClassroomAttendance, markAttendanceByScan } from "@/services/attendance"
+import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
 import type { AttendanceRecord } from "@/types"
 
 interface QrAttendanceDialogProps {
@@ -225,8 +226,13 @@ export function QrAttendanceDialog({
           `Attendance marked as Present for ${result.attendance.student_name || "Student"} (${labeled})!`,
         )
         await loadStudents()
-      } catch {
-        toast.error(`Failed to mark attendance for ${scannedId}`)
+      } catch (error) {
+        if (isAlreadyScannedError(error)) {
+          recentScansRef.current.set(scannedId, now)
+          toast.message(getApiErrorMessage(error, "Already scanned for today!"))
+          return
+        }
+        toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
       } finally {
         markingRef.current = false
       }
