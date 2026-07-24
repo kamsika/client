@@ -11,3 +11,12 @@ export function getApiErrorMessage(error: unknown, fallback = "Something went wr
   if (error instanceof Error && error.message) return error.message
   return fallback
 }
+
+export function isAlreadyScannedError(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) return false
+  const data = error.response.data as
+    | { already_scanned?: boolean; errors?: string[] }
+    | undefined
+  if (data?.already_scanned) return true
+  return Boolean(data?.errors?.some((msg) => /already scanned/i.test(msg)))
+}
