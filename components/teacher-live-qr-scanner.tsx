@@ -6,7 +6,7 @@ import { Camera, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
-import { getApiErrorMessage } from "@/lib/api-errors"
+import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
 import { scanCenterAttendance } from "@/services/attendance"
 import type { Attendance } from "@/types"
 
@@ -213,6 +213,11 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
         )
         onMarked?.(result.attendance)
       } catch (error) {
+        if (isAlreadyScannedError(error)) {
+          recentScansRef.current.set(scannedId, now)
+          toast.message(getApiErrorMessage(error, "Already scanned for today!"))
+          return
+        }
         toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
       } finally {
         markingRef.current = false
