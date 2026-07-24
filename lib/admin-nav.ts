@@ -5,6 +5,7 @@ export function getAdminNav(isSuperAdmin: boolean) {
   ]
   if (!isSuperAdmin) {
     items.push(
+      { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/sms-logs", label: "SMS Logs" },
       { href: "/admin/students/import", label: "Import Students" },
     )
