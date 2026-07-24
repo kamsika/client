@@ -54,3 +54,28 @@ export function formatLocalDateTime(value: string | null | undefined): string {
     timeZone: APP_DISPLAY_TIMEZONE,
   })
 }
+
+/** Calendar date (YYYY-MM-DD) in the app timezone — matches backend local_today(). */
+export function localTodayISO(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_DISPLAY_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date())
+}
+
+export function formatAttendanceDayLabel(dateISO: string): string {
+  if (!dateISO) return ""
+  if (dateISO === localTodayISO()) return `Today · ${dateISO}`
+  const [year, month, day] = dateISO.split("-").map(Number)
+  if (!year || !month || !day) return dateISO
+  const date = new Date(Date.UTC(year, month - 1, day, 12))
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
+}
