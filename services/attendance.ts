@@ -1,5 +1,10 @@
 import { apiClient } from "@/lib/api-client"
-import type { Attendance, ClassroomAttendanceResponse } from "@/types"
+import type {
+  Attendance,
+  AttendanceReportResponse,
+  ClassroomAttendanceResponse,
+  StudentAttendanceHistoryResponse,
+} from "@/types"
 
 export async function markAttendanceByScan(
   scannedStudentId: string,
@@ -80,11 +85,72 @@ export async function getClassroomAttendance(classroomId: number, date?: string)
   return data
 }
 
-export async function getStudentAttendance(studentId: number) {
-  const { data } = await apiClient.get<{ student: unknown; attendance: Attendance[] }>(
+export async function getStudentAttendance(
+  studentId: number,
+  params?: {
+    classroomId?: number
+    startDate?: string
+    endDate?: string
+  },
+) {
+  const { data } = await apiClient.get<StudentAttendanceHistoryResponse>(
     `/api/attendance/student/${studentId}`,
+    {
+      params: {
+        classroom_id: params?.classroomId,
+        start_date: params?.startDate,
+        end_date: params?.endDate,
+      },
+    },
   )
   return data
+}
+
+export async function getAttendanceReport(params: {
+  classroomId: number
+  startDate: string
+  endDate: string
+}) {
+  const { data } = await apiClient.get<AttendanceReportResponse>("/api/attendance/report", {
+    params: {
+      classroom_id: params.classroomId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    },
+  })
+  return data
+}
+
+export async function exportAttendanceReportCsv(params: {
+  classroomId: number
+  startDate: string
+  endDate: string
+}) {
+  const response = await apiClient.get("/api/attendance/report/export/csv", {
+    responseType: "blob",
+    params: {
+      classroom_id: params.classroomId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    },
+  })
+  return response.data as Blob
+}
+
+export async function exportAttendanceReportPdf(params: {
+  classroomId: number
+  startDate: string
+  endDate: string
+}) {
+  const response = await apiClient.get("/api/attendance/report/export/pdf", {
+    responseType: "blob",
+    params: {
+      classroom_id: params.classroomId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    },
+  })
+  return response.data as Blob
 }
 
 export async function exportAttendancePdf(classroomId: number, date?: string) {
