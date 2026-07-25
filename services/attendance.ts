@@ -75,6 +75,28 @@ export async function markAttendance(studentId: number, classroomId: number, sta
   return data
 }
 
+/** Kiosk / face scan mark — includes client timestamp and skips same-day duplicates. */
+export async function markKioskAttendance(payload: {
+  studentId: number
+  classroomId: number
+  timestamp?: string
+}) {
+  const { data } = await apiClient.post<{
+    success: true
+    message: string
+    attendance: Attendance
+  }>(
+    "/api/attendance",
+    {
+      studentId: payload.studentId,
+      classroomId: payload.classroomId,
+      status: "Present",
+      timestamp: payload.timestamp ?? new Date().toISOString(),
+    },
+  )
+  return data
+}
+
 export async function getClassroomAttendance(classroomId: number, date?: string) {
   const { data } = await apiClient.get<ClassroomAttendanceResponse>(
     `/api/attendance/classroom/${classroomId}`,

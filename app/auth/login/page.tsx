@@ -80,6 +80,11 @@ export default function LoginPage() {
           </form>
           <div className="text-muted-foreground mt-4 space-y-2 text-center text-sm">
             <p>
+              <Link href="/auth/parent-login" className="text-primary underline">
+                Parent login (phone number)
+              </Link>
+            </p>
+            <p>
               <Link href="/auth/register" className="text-primary underline">
                 Register as teacher, student, or parent
               </Link>

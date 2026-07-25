@@ -117,6 +117,33 @@ export interface AttendanceReportResponse {
   students: AttendanceReportStudentRow[]
 }
 
+export interface TeacherAttendanceStudentRow {
+  studentId: number
+  fullName: string | null
+  registrationNo: string
+  grade: string | null
+  section: string | null
+  status: "Present" | "Absent" | "Late"
+  statusIndicator: string
+  timestamp: string | null
+  classroomId: number | null
+  classroomName: string | null
+  attendanceId: number | null
+}
+
+export interface TeacherAttendanceOverview {
+  date: string
+  classroomId: number | null
+  classrooms: Classroom[]
+  summary: {
+    totalStudents: number
+    presentCount: number
+    absentCount: number
+    lateCount: number
+  }
+  students: TeacherAttendanceStudentRow[]
+}
+
 export interface StudyLog {
   id: number
   student_id: number
@@ -155,4 +182,27 @@ export interface BillingRecord {
 export interface AuthResponse {
   access_token: string
   user: User
+}
+
+export interface ParentAttendanceDay {
+  date: string
+  status: "Present" | "Absent" | "Late"
+  arrival_time: string | null
+}
+
+export interface ParentAttendanceSummary {
+  total_present: number
+  total_late: number
+  total_absent: number
+  total_marked: number
+  percentage: number
+}
+
+export interface ParentAttendanceResponse {
+  student: Student
+  month: number
+  year: number
+  days_in_month: number
+  records: ParentAttendanceDay[]
+  summary: ParentAttendanceSummary
 }

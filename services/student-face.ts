@@ -14,7 +14,7 @@ export async function listFaceProfiles() {
 }
 
 export async function saveStudentFace(studentId: number, descriptor: number[]) {
-  const { data } = await apiClient.put<{ student: unknown; message: string }>(
+  const { data } = await apiClient.post<{ student: unknown; message: string }>(
     `/api/students/${studentId}/face`,
     { descriptor },
   )

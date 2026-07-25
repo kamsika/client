@@ -25,6 +25,8 @@ import type { Classroom, User } from "@/types"
 
 const teacherNav = [
   { href: "/teacher/dashboard", label: "Dashboard" },
+  { href: "/teacher/attendance", label: "Attendance" },
+  { href: "/teacher/attendance/kiosk", label: "Face Kiosk" },
   { href: "/teacher/attendance/reports", label: "Reports" },
 ]
 
