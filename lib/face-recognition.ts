@@ -156,7 +156,12 @@ export function matchWithFaceMatcher(
 export function drawFaceOverlays(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
-  detections: Array<{ box: FaceBox; label?: string; matched?: boolean }>,
+  detections: Array<{
+    box: FaceBox
+    label?: string
+    matched?: boolean
+    alreadyMarked?: boolean
+  }>,
 ) {
   const width = video.videoWidth || video.clientWidth
   const height = video.videoHeight || video.clientHeight
@@ -174,8 +179,16 @@ export function drawFaceOverlays(
 
   for (const detection of detections) {
     const { x, y, width: boxW, height: boxH } = detection.box
+    const alreadyMarked = detection.alreadyMarked ?? false
     const matched = detection.matched ?? false
-    ctx.strokeStyle = matched ? "#22c55e" : "#facc15"
+
+    if (alreadyMarked) {
+      ctx.strokeStyle = "#38bdf8"
+    } else if (matched) {
+      ctx.strokeStyle = "#22c55e"
+    } else {
+      ctx.strokeStyle = "#facc15"
+    }
     ctx.lineWidth = Math.max(3, Math.round(width / 320))
     ctx.strokeRect(x, y, boxW, boxH)
 
@@ -184,9 +197,15 @@ export function drawFaceOverlays(
       ctx.font = `600 ${Math.max(14, Math.round(width / 40))}px system-ui, sans-serif`
       const textWidth = ctx.measureText(detection.label).width
       const labelH = Math.max(22, Math.round(width / 28))
-      ctx.fillStyle = matched ? "rgba(34, 197, 94, 0.9)" : "rgba(250, 204, 21, 0.9)"
+      if (alreadyMarked) {
+        ctx.fillStyle = "rgba(14, 165, 233, 0.92)"
+      } else if (matched) {
+        ctx.fillStyle = "rgba(34, 197, 94, 0.9)"
+      } else {
+        ctx.fillStyle = "rgba(250, 204, 21, 0.9)"
+      }
       ctx.fillRect(x, Math.max(0, y - labelH), textWidth + padding * 2, labelH)
-      ctx.fillStyle = matched ? "#052e16" : "#422006"
+      ctx.fillStyle = alreadyMarked ? "#082f49" : matched ? "#052e16" : "#422006"
       ctx.fillText(detection.label, x + padding, Math.max(labelH - 6, y - 6))
     }
   }
