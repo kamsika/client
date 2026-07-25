@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { AttendanceSummaryStats } from "@/components/attendance-summary-stats"
+import { StudentAttendanceHistoryDialog } from "@/components/student-attendance-history-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -39,6 +40,8 @@ export function AttendanceDayPanel({
   const [absent, setAbsent] = useState<AttendanceRecord[]>([])
   const [summary, setSummary] = useState<AttendanceSummary | null>(null)
   const [markingId, setMarkingId] = useState<number | null>(null)
+  const [historyStudentId, setHistoryStudentId] = useState<number | null>(null)
+  const [historyStudentLabel, setHistoryStudentLabel] = useState<string | null>(null)
 
   const isToday = date === localTodayISO()
   const canMark = allowMarkPresent && isToday
@@ -89,6 +92,11 @@ export function AttendanceDayPanel({
     }
   }
 
+  function openHistory(studentId: number, label: string | null | undefined) {
+    setHistoryStudentId(studentId)
+    setHistoryStudentLabel(label || null)
+  }
+
   return (
     <div className="space-y-4">
       <AttendanceSummaryStats summary={summary} />
@@ -126,7 +134,13 @@ export function AttendanceDayPanel({
                     {present.map(({ student, attendance }) => (
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">
-                          {student.full_name || "Student"}
+                          <button
+                            type="button"
+                            className="text-left underline-offset-4 hover:underline"
+                            onClick={() => openHistory(student.id, student.full_name)}
+                          >
+                            {student.full_name || "Student"}
+                          </button>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {student.registration_no || "—"}
@@ -167,7 +181,13 @@ export function AttendanceDayPanel({
                     {absent.map(({ student }) => (
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">
-                          {student.full_name || "Student"}
+                          <button
+                            type="button"
+                            className="text-left underline-offset-4 hover:underline"
+                            onClick={() => openHistory(student.id, student.full_name)}
+                          >
+                            {student.full_name || "Student"}
+                          </button>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
                           {student.registration_no || "—"}
@@ -202,6 +222,19 @@ export function AttendanceDayPanel({
           </TabsContent>
         </Tabs>
       )}
+
+      <StudentAttendanceHistoryDialog
+        studentId={historyStudentId}
+        studentLabel={historyStudentLabel}
+        classroomId={classroomId}
+        open={historyStudentId !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setHistoryStudentId(null)
+            setHistoryStudentLabel(null)
+          }
+        }}
+      />
     </div>
   )
 }
