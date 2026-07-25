@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { AttendanceDatePicker } from "@/components/attendance-date-picker"
+import { AttendanceDayPanel } from "@/components/attendance-day-panel"
 import { DashboardShell } from "@/components/dashboard-shell"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
@@ -15,68 +15,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { getAdminNav } from "@/lib/admin-nav"
 import { getStoredUser } from "@/lib/api-client"
-import { formatAttendanceDayLabel, formatLocalTime, localTodayISO } from "@/lib/format-time"
-import { getCenterAttendance } from "@/services/attendance"
+import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
 import { listClassrooms } from "@/services/classroom"
-import type { Attendance, Classroom, User } from "@/types"
+import type { Classroom, User } from "@/types"
 
 export default function AdminAttendancePage() {
   const user = getStoredUser<User>()
   const navItems = getAdminNav(false)
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string>("all")
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>("")
   const [selectedDate, setSelectedDate] = useState(localTodayISO)
-  const [records, setRecords] = useState<Attendance[]>([])
-  const [attendanceDate, setAttendanceDate] = useState("")
-  const [loading, setLoading] = useState(true)
 
   const isViewingToday = selectedDate === localTodayISO()
-
-  const loadAttendance = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await getCenterAttendance({
-        date: selectedDate,
-        classroomId:
-          selectedClassroomId !== "all" ? Number(selectedClassroomId) : undefined,
-      })
-      setRecords(data.records)
-      setAttendanceDate(data.date)
-    } catch {
-      toast.error("Failed to load attendance")
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedClassroomId, selectedDate])
+  const classroomId = selectedClassroomId ? Number(selectedClassroomId) : null
 
   useEffect(() => {
     listClassrooms()
-      .then(setClassrooms)
+      .then((items) => {
+        setClassrooms(items)
+        if (items.length > 0) {
+          setSelectedClassroomId(String(items[0].id))
+        }
+      })
       .catch(() => toast.error("Failed to load classrooms"))
   }, [])
-
-  useEffect(() => {
-    void loadAttendance()
-  }, [loadAttendance])
-
-  useEffect(() => {
-    if (!isViewingToday) return
-    const interval = setInterval(() => {
-      void loadAttendance()
-    }, 10000)
-    return () => clearInterval(interval)
-  }, [isViewingToday, loadAttendance])
 
   return (
     <DashboardShell
@@ -91,9 +56,9 @@ export default function AdminAttendancePage() {
               {isViewingToday ? "Today's Attendance" : "Attendance by Date"}
             </CardTitle>
             <CardDescription>
-              Review scanned students for your center
-              {user?.institution_id ? ` (#${user.institution_id})` : ""}. Default view is today;
-              pick any past date to browse history.
+              Compare the active student roster against scans for your center
+              {user?.institution_id ? ` (#${user.institution_id})` : ""}. Students without a record
+              for the selected class and date are shown as Absent.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -109,10 +74,9 @@ export default function AdminAttendancePage() {
                 onValueChange={(value) => value && setSelectedClassroomId(value)}
               >
                 <SelectTrigger id="admin-attendance-class" className="w-full">
-                  <SelectValue placeholder="All classrooms" />
+                  <SelectValue placeholder="Select classroom" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All classrooms</SelectItem>
                   {classrooms.map((cls) => (
                     <SelectItem key={cls.id} value={String(cls.id)}>
                       {cls.name}
@@ -126,55 +90,23 @@ export default function AdminAttendancePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Scanned students</CardTitle>
+            <CardTitle>Class attendance overview</CardTitle>
             <CardDescription>
-              {formatAttendanceDayLabel(attendanceDate || selectedDate)} · {records.length} marked
+              {formatAttendanceDayLabel(selectedDate)}
+              {classrooms.find((c) => String(c.id) === selectedClassroomId)
+                ? ` · ${classrooms.find((c) => String(c.id) === selectedClassroomId)?.name}`
+                : ""}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <p className="text-muted-foreground text-sm">Loading attendance...</p>
-            ) : records.length === 0 ? (
+            {!classroomId ? (
               <p className="text-muted-foreground text-sm">
-                {isViewingToday
-                  ? "No students scanned yet today."
-                  : "No attendance records for this date."}
+                {classrooms.length === 0
+                  ? "No classrooms found. Create a classroom to track attendance."
+                  : "Select a classroom to view summary stats and absentees."}
               </p>
             ) : (
-              <div className="rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Student</TableHead>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Class</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {records.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-medium">
-                          {record.student_name || "Student"}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {record.registration_no || "—"}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {record.classroom_name || `Class #${record.classroom_id}`}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record.status === "Late" ? "destructive" : "default"}>
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatLocalTime(record.arrival_time)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <AttendanceDayPanel classroomId={classroomId} date={selectedDate} />
             )}
           </CardContent>
         </Card>
