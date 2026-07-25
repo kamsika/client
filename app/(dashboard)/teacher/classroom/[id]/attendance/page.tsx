@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 
 import { AttendanceDatePicker } from "@/components/attendance-date-picker"
+import { AttendanceSummaryStats } from "@/components/attendance-summary-stats"
 import { AttendanceToggle } from "@/components/attendance-toggle"
 import { DashboardShell } from "@/components/dashboard-shell"
 import { Button } from "@/components/ui/button"
@@ -12,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { downloadBlob } from "@/lib/download"
 import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
 import { exportAttendancePdf, getClassroomAttendance, markAttendance } from "@/services/attendance"
-import type { AttendanceRecord, Classroom } from "@/types"
+import type { AttendanceRecord, AttendanceSummary, Classroom } from "@/types"
 
 const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
 
@@ -22,6 +23,7 @@ export default function ClassroomAttendancePage() {
 
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [records, setRecords] = useState<AttendanceRecord[]>([])
+  const [summary, setSummary] = useState<AttendanceSummary | null>(null)
   const [selectedDate, setSelectedDate] = useState(localTodayISO)
   const [date, setDate] = useState("")
   const [loadingId, setLoadingId] = useState<number | null>(null)
@@ -33,6 +35,7 @@ export default function ClassroomAttendancePage() {
       const data = await getClassroomAttendance(classroomId, selectedDate)
       setClassroom(data.classroom)
       setRecords(data.records)
+      setSummary(data.summary)
       setDate(data.date)
     } catch {
       toast.error("Failed to load attendance")
@@ -48,6 +51,7 @@ export default function ClassroomAttendancePage() {
         if (cancelled) return
         setClassroom(data.classroom)
         setRecords(data.records)
+        setSummary(data.summary)
         setDate(data.date)
       } catch {
         if (!cancelled) {
@@ -130,7 +134,8 @@ export default function ClassroomAttendancePage() {
               Export PDF
             </Button>
           </CardHeader>
-          <CardContent className="grid gap-3">
+          <CardContent className="grid gap-4">
+            <AttendanceSummaryStats summary={summary} />
             {!isViewingToday && (
               <p className="text-muted-foreground text-sm">
                 Viewing a past date (read-only). Switch to today to mark Present/Absent.
@@ -148,7 +153,7 @@ export default function ClassroomAttendancePage() {
               />
             ))}
             {records.length === 0 && (
-              <p className="text-muted-foreground text-sm">No students enrolled in this institution.</p>
+              <p className="text-muted-foreground text-sm">No active students enrolled in this institution.</p>
             )}
           </CardContent>
         </Card>
