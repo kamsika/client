@@ -14,6 +14,7 @@ interface AttendanceToggleProps {
   loading?: boolean
   disabled?: boolean
   onMark: (studentId: number, status?: string) => Promise<void>
+  onNameClick?: (studentId: number) => void
 }
 
 export function AttendanceToggle({
@@ -23,6 +24,7 @@ export function AttendanceToggle({
   loading,
   disabled,
   onMark,
+  onNameClick,
 }: AttendanceToggleProps) {
   const status = attendance?.status
   const actionsDisabled = Boolean(loading || disabled)
@@ -30,7 +32,17 @@ export function AttendanceToggle({
   return (
     <div className="flex items-center justify-between rounded-lg border p-4">
       <div>
-        <p className="font-medium">{studentName}</p>
+        {onNameClick ? (
+          <button
+            type="button"
+            className="font-medium underline-offset-4 hover:underline"
+            onClick={() => onNameClick(studentId)}
+          >
+            {studentName}
+          </button>
+        ) : (
+          <p className="font-medium">{studentName}</p>
+        )}
         {attendance?.arrival_time && (
           <p className="text-muted-foreground text-sm">
             Arrived: {formatLocalTime(attendance.arrival_time)}
