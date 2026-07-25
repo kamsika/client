@@ -43,7 +43,8 @@ import { listFaceProfiles, type StudentFaceProfile } from "@/services/student-fa
 import type { Classroom } from "@/types"
 
 const DETECT_INTERVAL_MS = 300
-const COOLDOWN_MS = 5000
+/** Default per-student cooldown between kiosk attendance triggers. */
+export const KIOSK_COOLDOWN_MS = 5000
 const FEEDBACK_MS = 3500
 
 interface KioskLogEntry {
@@ -67,6 +68,8 @@ interface RecognizedStudent {
 interface KioskAttendanceScreenProps {
   /** Restrict to a single classroom (teacher classroom page). */
   fixedClassroomId?: number
+  /** Milliseconds before the same student can trigger again (default 5000). */
+  cooldownMs?: number
 }
 
 function initials(name: string) {
@@ -80,15 +83,44 @@ function formatClock(date: Date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
 }
 
-export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScreenProps = {}) {
+function isWithinCooldown(
+  recentDetections: Map<number, number>,
+  studentId: number,
+  now: number,
+  cooldownMs: number,
+) {
+  const lastMarkedAt = recentDetections.get(studentId)
+  return typeof lastMarkedAt === "number" && now - lastMarkedAt < cooldownMs
+}
+
+function pruneRecentDetections(
+  recentDetections: Map<number, number>,
+  now: number,
+  cooldownMs: number,
+) {
+  for (const [studentId, markedAt] of recentDetections) {
+    if (now - markedAt >= cooldownMs) {
+      recentDetections.delete(studentId)
+    }
+  }
+}
+
+export function KioskAttendanceScreen({
+  fixedClassroomId,
+  cooldownMs = KIOSK_COOLDOWN_MS,
+}: KioskAttendanceScreenProps = {}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const matcherRef = useRef<FaceMatcherInstance | null>(null)
   const profilesByIdRef = useRef<Map<number, { label: string; registrationNo: string }>>(new Map())
-  const cooldownRef = useRef<Map<number, number>>(new Map())
+  /** studentId → last successful / attempted mark timestamp (ms). */
+  const recentDetectionsRef = useRef<Map<number, number>>(new Map())
+  /** Students already marked successfully in this kiosk session (unique UI + API). */
+  const markedStudentIdsRef = useRef<Set<number>>(new Set())
   const markingRef = useRef(false)
   const detectingRef = useRef(false)
   const classroomIdRef = useRef<number | null>(null)
+  const cooldownMsRef = useRef(cooldownMs)
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomId, setClassroomId] = useState<string>(
@@ -118,7 +150,16 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
 
   useEffect(() => {
     classroomIdRef.current = classroomId ? Number(classroomId) : null
+    // New classroom = new session uniqueness scope.
+    markedStudentIdsRef.current.clear()
+    recentDetectionsRef.current.clear()
+    setLog([])
+    setRecognized(null)
   }, [classroomId])
+
+  useEffect(() => {
+    cooldownMsRef.current = cooldownMs
+  }, [cooldownMs])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(formatClock(new Date())), 1000)
@@ -243,12 +284,26 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
     setCameraActive(false)
     setScanning(false)
     setRecognized(null)
+    recentDetectionsRef.current.clear()
+    // Keep markedStudentIds for the session so restarting the camera
+    // does not re-mark or re-log the same students.
   }
 
   const recordMatch = useCallback(async (studentId: number, distance: number) => {
+    // Session uniqueness: never re-call API or append duplicate UI rows.
+    if (markedStudentIdsRef.current.has(studentId)) {
+      return
+    }
+
     const now = Date.now()
-    const lastAt = cooldownRef.current.get(studentId)
-    if (lastAt && now - lastAt < COOLDOWN_MS) {
+    const cooldownWindow = cooldownMsRef.current
+
+    // Short cooldown still blocks parallel frames before the set is updated.
+    if (isWithinCooldown(recentDetectionsRef.current, studentId, now, cooldownWindow)) {
+      return
+    }
+
+    if (markingRef.current) {
       return
     }
 
@@ -262,8 +317,8 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
     const name = profile?.label ?? `Student #${studentId}`
     const registrationNo = profile?.registrationNo ?? ""
 
-    // Reserve cooldown immediately to avoid parallel double-posts.
-    cooldownRef.current.set(studentId, now)
+    recentDetectionsRef.current.set(studentId, now)
+    pruneRecentDetections(recentDetectionsRef.current, now, cooldownWindow)
     markingRef.current = true
 
     try {
@@ -274,56 +329,61 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
         timestamp,
       })
 
-      const status = result.attendance.status
-      playSuccessChime()
-      setRecognized({
-        studentId,
-        name,
-        registrationNo,
-        status,
-        distance,
-      })
-      setLog((prev) =>
-        [
-          {
-            id: `${studentId}-${now}`,
-            studentId,
-            name,
-            registrationNo,
-            status,
-            timeLabel: formatClock(new Date()),
-            distance,
-          },
-          ...prev,
-        ].slice(0, 40),
-      )
-    } catch (error) {
-      if (isAlreadyScannedError(error)) {
+      // Mark as handled for this session before updating UI.
+      markedStudentIdsRef.current.add(studentId)
+
+      const attendance = result.attendance ?? result.data
+      const status = attendance?.status || result.status || "Present"
+      const alreadyToday = /already marked/i.test(result.message || "")
+
+      if (!alreadyToday) {
         playSuccessChime()
         setRecognized({
           studentId,
           name,
           registrationNo,
-          status: "Present",
+          status,
           distance,
         })
-        setLog((prev) =>
-          [
+        setLog((prev) => {
+          if (prev.some((entry) => entry.studentId === studentId)) {
+            return prev
+          }
+          return [
             {
-              id: `${studentId}-${now}-dup`,
+              id: String(studentId),
               studentId,
               name,
               registrationNo,
-              status: "Already marked",
+              status,
               timeLabel: formatClock(new Date()),
               distance,
             },
             ...prev,
-          ].slice(0, 40),
-        )
+          ].slice(0, 40)
+        })
       } else {
-        // Allow retry sooner on hard failures.
-        cooldownRef.current.delete(studentId)
+        // Backend says already marked today — track in session, skip list duplicate.
+        setRecognized({
+          studentId,
+          name,
+          registrationNo,
+          status: "Already Marked Today",
+          distance,
+        })
+      }
+    } catch (error) {
+      if (isAlreadyScannedError(error)) {
+        markedStudentIdsRef.current.add(studentId)
+        setRecognized({
+          studentId,
+          name,
+          registrationNo,
+          status: "Already Marked Today",
+          distance,
+        })
+      } else {
+        recentDetectionsRef.current.delete(studentId)
         toast.error(getApiErrorMessage(error, `Failed to mark ${name}`))
       }
     } finally {
@@ -353,19 +413,25 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
         const detections = await detectFacesWithBoxes(video)
         if (cancelled) return
 
-        const overlays: Array<{ box: (typeof detections)[0]["box"]; label?: string; matched?: boolean }> =
-          []
+        const overlays: Array<{
+          box: (typeof detections)[0]["box"]
+          label?: string
+          matched?: boolean
+          alreadyMarked?: boolean
+        }> = []
         let bestMatch: { studentId: number; distance: number; label: string } | null = null
 
         for (const detection of detections) {
           const match = matchWithFaceMatcher(matcher, detection.descriptor, profilesByIdRef.current)
           if (match) {
+            const alreadyMarked = markedStudentIdsRef.current.has(match.studentId)
             overlays.push({
               box: detection.box,
-              label: match.label,
-              matched: true,
+              label: alreadyMarked ? "Already Marked Today" : match.label,
+              matched: !alreadyMarked,
+              alreadyMarked,
             })
-            if (!bestMatch || match.distance < bestMatch.distance) {
+            if (!alreadyMarked && (!bestMatch || match.distance < bestMatch.distance)) {
               bestMatch = match
             }
           } else {
@@ -379,9 +445,26 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
 
         drawFaceOverlays(canvas, video, overlays)
 
-        if (bestMatch && !markingRef.current) {
-          await recordMatch(bestMatch.studentId, bestMatch.distance)
+        if (!bestMatch || markingRef.current) {
+          return
         }
+
+        if (markedStudentIdsRef.current.has(bestMatch.studentId)) {
+          return
+        }
+
+        if (
+          isWithinCooldown(
+            recentDetectionsRef.current,
+            bestMatch.studentId,
+            Date.now(),
+            cooldownMsRef.current,
+          )
+        ) {
+          return
+        }
+
+        await recordMatch(bestMatch.studentId, bestMatch.distance)
       } catch {
         // Ignore transient frame errors.
       } finally {
@@ -574,7 +657,7 @@ export function KioskAttendanceScreen({ fixedClassroomId }: KioskAttendanceScree
         <div className="border-b px-4 py-3">
           <h3 className="font-semibold">Recent attendance</h3>
           <p className="text-muted-foreground text-xs">
-            5s cooldown per student · last {log.length} marks
+            Unique students this session · {log.length} marked
           </p>
         </div>
         <div className="flex-1 overflow-y-auto">
