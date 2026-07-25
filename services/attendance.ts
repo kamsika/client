@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client"
-import type { Attendance, AttendanceRecord, Classroom } from "@/types"
+import type { Attendance, ClassroomAttendanceResponse } from "@/types"
 
 export async function markAttendanceByScan(
   scannedStudentId: string,
@@ -71,13 +71,12 @@ export async function markAttendance(studentId: number, classroomId: number, sta
 }
 
 export async function getClassroomAttendance(classroomId: number, date?: string) {
-  const { data } = await apiClient.get<{
-    classroom: Classroom
-    date: string
-    records: AttendanceRecord[]
-  }>(`/api/attendance/classroom/${classroomId}`, {
-    params: date ? { date } : undefined,
-  })
+  const { data } = await apiClient.get<ClassroomAttendanceResponse>(
+    `/api/attendance/classroom/${classroomId}`,
+    {
+      params: date ? { date } : undefined,
+    },
+  )
   return data
 }
 
