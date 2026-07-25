@@ -81,6 +81,42 @@ export interface ClassroomAttendanceResponse {
   summary: AttendanceSummary
 }
 
+export interface StudentAttendanceHistorySummary {
+  total_classes: number
+  total_present: number
+  total_absent: number
+  percentage: number
+  classroom_id: number | null
+  classroom_name: string | null
+  start_date: string | null
+  end_date: string | null
+}
+
+export interface StudentAttendanceHistoryResponse {
+  student: Student
+  attendance: Attendance[]
+  summary: StudentAttendanceHistorySummary
+}
+
+export interface AttendanceReportStudentRow {
+  student_id: number
+  registration_no: string
+  student_name: string | null
+  total_classes: number
+  total_present: number
+  total_absent: number
+  percentage: number
+}
+
+export interface AttendanceReportResponse {
+  classroom: Classroom
+  start_date: string
+  end_date: string
+  total_classes_held: number
+  student_count: number
+  students: AttendanceReportStudentRow[]
+}
+
 export interface StudyLog {
   id: number
   student_id: number
