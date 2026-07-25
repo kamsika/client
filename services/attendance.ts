@@ -83,7 +83,9 @@ export async function markKioskAttendance(payload: {
 }) {
   const { data } = await apiClient.post<{
     success: true
+    status: "Present"
     message: string
+    data: Attendance
     attendance: Attendance
   }>(
     "/api/attendance",
