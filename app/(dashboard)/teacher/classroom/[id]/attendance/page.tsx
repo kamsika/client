@@ -8,6 +8,7 @@ import { AttendanceDatePicker } from "@/components/attendance-date-picker"
 import { AttendanceSummaryStats } from "@/components/attendance-summary-stats"
 import { AttendanceToggle } from "@/components/attendance-toggle"
 import { DashboardShell } from "@/components/dashboard-shell"
+import { StudentAttendanceHistoryDialog } from "@/components/student-attendance-history-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { downloadBlob } from "@/lib/download"
@@ -15,7 +16,10 @@ import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
 import { exportAttendancePdf, getClassroomAttendance, markAttendance } from "@/services/attendance"
 import type { AttendanceRecord, AttendanceSummary, Classroom } from "@/types"
 
-const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
+const teacherNav = [
+  { href: "/teacher/dashboard", label: "Dashboard" },
+  { href: "/teacher/attendance/reports", label: "Reports" },
+]
 
 export default function ClassroomAttendancePage() {
   const params = useParams()
@@ -27,6 +31,8 @@ export default function ClassroomAttendancePage() {
   const [selectedDate, setSelectedDate] = useState(localTodayISO)
   const [date, setDate] = useState("")
   const [loadingId, setLoadingId] = useState<number | null>(null)
+  const [historyStudentId, setHistoryStudentId] = useState<number | null>(null)
+  const [historyStudentLabel, setHistoryStudentLabel] = useState<string | null>(null)
 
   const isViewingToday = selectedDate === localTodayISO()
 
@@ -150,6 +156,10 @@ export default function ClassroomAttendancePage() {
                 loading={loadingId === student.id}
                 disabled={!isViewingToday}
                 onMark={handleMark}
+                onNameClick={(id) => {
+                  setHistoryStudentId(id)
+                  setHistoryStudentLabel(student.full_name || student.registration_no)
+                }}
               />
             ))}
             {records.length === 0 && (
@@ -157,6 +167,19 @@ export default function ClassroomAttendancePage() {
             )}
           </CardContent>
         </Card>
+
+        <StudentAttendanceHistoryDialog
+          studentId={historyStudentId}
+          studentLabel={historyStudentLabel}
+          classroomId={classroomId}
+          open={historyStudentId !== null}
+          onOpenChange={(next) => {
+            if (!next) {
+              setHistoryStudentId(null)
+              setHistoryStudentLabel(null)
+            }
+          }}
+        />
       </div>
     </DashboardShell>
   )
