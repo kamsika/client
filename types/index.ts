@@ -62,6 +62,23 @@ export interface Attendance {
 export interface AttendanceRecord {
   student: Student
   attendance: Attendance | null
+  effective_status?: "Absent"
+}
+
+export interface AttendanceSummary {
+  total_enrolled: number
+  total_present: number
+  total_absent: number
+  attendance_rate: number
+}
+
+export interface ClassroomAttendanceResponse {
+  classroom: Classroom
+  date: string
+  records: AttendanceRecord[]
+  present: AttendanceRecord[]
+  absent: AttendanceRecord[]
+  summary: AttendanceSummary
 }
 
 export interface StudyLog {
