@@ -23,7 +23,10 @@ import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
 import { listClassrooms } from "@/services/classroom"
 import type { Classroom, User } from "@/types"
 
-const teacherNav = [{ href: "/teacher/dashboard", label: "Dashboard" }]
+const teacherNav = [
+  { href: "/teacher/dashboard", label: "Dashboard" },
+  { href: "/teacher/attendance/reports", label: "Reports" },
+]
 
 export default function TeacherDashboardPage() {
   const user = getStoredUser<User>()
@@ -108,11 +111,18 @@ export default function TeacherDashboardPage() {
               )}
 
               {classrooms.length > 0 && selectedClassroomId && (
-                <Link href={`/teacher/classroom/${selectedClassroomId}/attendance`}>
-                  <Button variant="outline" className="w-full">
-                    Open Manual Attendance
-                  </Button>
-                </Link>
+                <div className="grid gap-2">
+                  <Link href={`/teacher/classroom/${selectedClassroomId}/attendance`}>
+                    <Button variant="outline" className="w-full">
+                      Open Manual Attendance
+                    </Button>
+                  </Link>
+                  <Link href="/teacher/attendance/reports">
+                    <Button variant="secondary" className="w-full">
+                      Attendance Reports & Export
+                    </Button>
+                  </Link>
+                </div>
               )}
             </CardContent>
           </Card>
