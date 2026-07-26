@@ -35,9 +35,34 @@ export async function updateStudent(studentId: number, input: UpdateStudentInput
   return data
 }
 
-export async function listStudents() {
-  const { data } = await apiClient.get<{ students: Student[] }>("/api/students")
+export async function updateStudentSubjects(studentId: number, enrolledSubjects: string[]) {
+  const { data } = await apiClient.put<{
+    success: boolean
+    student: Student
+    enrolledSubjects: string[]
+    message: string
+  }>(`/api/students/${studentId}/subjects`, { enrolledSubjects })
+  return data
+}
+
+export async function listStudents(search?: string) {
+  const { data } = await apiClient.get<{ students: Student[]; count?: number; search?: string | null }>(
+    "/api/students",
+    {
+      params: search?.trim() ? { search: search.trim() } : undefined,
+    },
+  )
   return data.students
+}
+
+export async function searchStudents(query: string) {
+  const { data } = await apiClient.get<{ students: Student[]; count?: number; search?: string | null }>(
+    "/api/students",
+    {
+      params: { search: query.trim() },
+    },
+  )
+  return data
 }
 
 export async function listTeachers() {
