@@ -180,7 +180,14 @@ export function ManualAttendancePanel() {
           status: draft[student.studentId] ?? "Absent",
         })),
       })
-      toast.success(result.message || `Saved ${result.count} student(s)`)
+      if (result.errors?.length) {
+        toast.warning(result.errors.join(" "))
+      }
+      if (result.count > 0) {
+        toast.success(result.message || `Saved ${result.count} student(s)`)
+      } else if (result.errors?.length) {
+        toast.error("No attendance was saved because the students are not enrolled for this subject.")
+      }
       await loadRoster()
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to save attendance"))
@@ -379,8 +386,7 @@ export function ManualAttendancePanel() {
                     </TableRow>
                   )
                 })}
-              </TableBody>
-            </Table>
+              </TableBody>            </Table>
           </div>
         )}
       </CardContent>

@@ -4,16 +4,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-/** Browsers strip whitespace text nodes inside tables; filter them to avoid hydration mismatches. */
-function withoutWhitespaceText(children: React.ReactNode) {
-  return React.Children.toArray(children).filter((child) => {
-    if (typeof child === "string") return child.trim().length > 0
-    if (typeof child === "number") return true
-    return true
-  })
-}
-
-function Table({ className, children, ...props }: React.ComponentProps<"table">) {
+function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
@@ -23,38 +14,32 @@ function Table({ className, children, ...props }: React.ComponentProps<"table">)
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
-      >
-        {withoutWhitespaceText(children)}
-      </table>
+      />
     </div>
   )
 }
 
-function TableHeader({ className, children, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
       className={cn("[&_tr]:border-b", className)}
       {...props}
-    >
-      {withoutWhitespaceText(children)}
-    </thead>
+    />
   )
 }
 
-function TableBody({ className, children, ...props }: React.ComponentProps<"tbody">) {
+function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
       className={cn("[&_tr:last-child]:border-0", className)}
       {...props}
-    >
-      {withoutWhitespaceText(children)}
-    </tbody>
+    />
   )
 }
 
-function TableFooter({ className, children, ...props }: React.ComponentProps<"tfoot">) {
+function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
     <tfoot
       data-slot="table-footer"
@@ -63,13 +48,11 @@ function TableFooter({ className, children, ...props }: React.ComponentProps<"tf
         className
       )}
       {...props}
-    >
-      {withoutWhitespaceText(children)}
-    </tfoot>
+    />
   )
 }
 
-function TableRow({ className, children, ...props }: React.ComponentProps<"tr">) {
+function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
     <tr
       data-slot="table-row"
@@ -78,9 +61,7 @@ function TableRow({ className, children, ...props }: React.ComponentProps<"tr">)
         className
       )}
       {...props}
-    >
-      {withoutWhitespaceText(children)}
-    </tr>
+    />
   )
 }
 

@@ -140,6 +140,13 @@ export interface TeacherAttendanceStudentRow {
   classroomId: number | null
   classroomName: string | null
   attendanceId: number | null
+  monthlyPayment?: {
+    billing_period: string
+    amount_due: number | null
+    payment_status: "Pending" | "Paid" | "Overdue"
+    paid_at: string | null
+  }
+  monthlyPaymentStatus?: "Pending" | "Paid" | "Overdue"
 }
 
 export interface TeacherAttendanceOverview {

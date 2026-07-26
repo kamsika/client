@@ -315,6 +315,7 @@ export function TeacherAttendanceDashboard({
                     <TableHead>Student</TableHead>
                     <TableHead>Roll Number</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Monthly Fee</TableHead>
                     <TableHead>Time of Scan</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -349,6 +350,19 @@ export function TeacherAttendanceDashboard({
                           className={cn("font-medium", statusBadgeClass(student.status))}
                         >
                           {student.status} {student.statusIndicator}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-medium",
+                            student.monthlyPaymentStatus === "Paid"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-amber-200 bg-amber-50 text-amber-900",
+                          )}
+                        >
+                          {student.monthlyPaymentStatus ?? "Pending"}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm tabular-nums">

@@ -5,6 +5,7 @@ import { Camera, ScanFace, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,8 @@ import {
   startFaceCamera,
   stopFaceCamera,
 } from "@/lib/face-recognition"
-import { markAttendance } from "@/services/attendance"
+import { getApiErrorMessage } from "@/lib/api-errors"
+import { markKioskAttendance, type AttendanceSubjectOption } from "@/services/attendance"
 import { listFaceProfiles, saveStudentFace, type StudentFaceProfile } from "@/services/student-face"
 
 interface FaceAttendanceDialogProps {
@@ -59,6 +61,12 @@ export function FaceAttendanceDialog({
   const [lastMatch, setLastMatch] = useState<string | null>(null)
   const [enrollStudentId, setEnrollStudentId] = useState<string>("")
   const [enrolling, setEnrolling] = useState(false)
+  const [pendingSelection, setPendingSelection] = useState<{
+    studentId: number
+    studentName: string
+    options: AttendanceSubjectOption[]
+    paymentStatus?: "Pending" | "Paid" | "Overdue"
+  } | null>(null)
 
   const enrolledProfiles = profiles.filter(
     (profile) => profile.descriptor && profile.descriptor.length > 0,
@@ -89,6 +97,7 @@ export function FaceAttendanceDialog({
     setCameraError(null)
     setLastMatch(null)
     setEnrollStudentId("")
+    setPendingSelection(null)
     recentMarksRef.current.clear()
   }, [stopCameraTracks])
 
@@ -135,6 +144,15 @@ export function FaceAttendanceDialog({
     }
   }, [open])
 
+  useEffect(() => {
+    const video = videoRef.current
+    return () => {
+      if (video) {
+        stopFaceCamera(video)
+      }
+    }
+  }, [])
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       resetDialogState()
@@ -177,6 +195,7 @@ export function FaceAttendanceDialog({
 
   const handleMarkMatch = useCallback(
     async (studentId: number, label: string) => {
+      if (pendingSelection) return
       const now = Date.now()
       const lastMarkedAt = recentMarksRef.current.get(studentId)
       if (lastMarkedAt && now - lastMarkedAt < 4000) {
@@ -185,24 +204,70 @@ export function FaceAttendanceDialog({
 
       markingRef.current = true
       try {
-        const result = await markAttendance(studentId, classroomId)
+        const result = await markKioskAttendance({
+          studentId,
+          classroomId,
+          timestamp: new Date().toISOString(),
+        })
         recentMarksRef.current.set(studentId, now)
         setLastMatch(label)
+        const attendanceOptions =
+          result.attendanceOptions ?? result.attendance_options ?? []
+        const paymentStatus =
+          result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status
+        if (attendanceOptions.length > 1) {
+          setPendingSelection({
+            studentId,
+            studentName: result.studentName || label,
+            options: attendanceOptions,
+            paymentStatus,
+          })
+        }
+        if (result.status === "NoClass") {
+          toast.message(`${label}: no timetable class is active right now.`)
+          return
+        }
+        if (result.status === "AlreadyMarked") {
+          toast.message(result.message || `${label} is already marked for this class.`)
+          return
+        }
+        const attendance = result.attendance ?? result.data
+        if (!attendance) {
+          toast.error(result.message || `Attendance was not recorded for ${label}`)
+          return
+        }
         toast.success(
-          result.attendance.status === "Late"
-            ? `${label} marked late (${result.delta_minutes} min) — parent SMS triggered`
-            : result.attendance.status === "Absent"
-              ? `${label} marked absent — parent SMS triggered`
-              : `${label} marked ${result.attendance.status}`,
+          attendance.status === "Late"
+            ? `${label} marked late (${result.delta_minutes} min) — fee: ${paymentStatus ?? "Pending"}`
+            : attendance.status === "Absent"
+              ? `${label} marked absent — fee: ${paymentStatus ?? "Pending"}`
+              : `${label} marked ${attendance.status} · Monthly fee: ${paymentStatus ?? "Pending"}`,
         )
-      } catch {
-        toast.error(`Failed to mark attendance for ${label}`)
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${label}`))
       } finally {
         markingRef.current = false
       }
     },
-    [classroomId],
+    [classroomId, pendingSelection],
   )
+
+  async function confirmUpcomingClasses(selectedSubjects: string[]) {
+    if (!pendingSelection) return
+    try {
+      const result = await markKioskAttendance({
+        studentId: pendingSelection.studentId,
+        classroomId,
+        timestamp: new Date().toISOString(),
+        selectedSubjects,
+      })
+      const newlyMarked = result.newlyMarkedSubjects ?? []
+      if (newlyMarked.length > 0) toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to confirm class attendance"))
+      throw error
+    }
+  }
 
   useEffect(() => {
     if (!open || !cameraActive || mode !== "mark") {
@@ -279,7 +344,18 @@ export function FaceAttendanceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <AttendanceSubjectSelectionDialog
+        open={Boolean(pendingSelection)}
+        studentName={pendingSelection?.studentName ?? "Student"}
+        options={pendingSelection?.options ?? []}
+        paymentStatus={pendingSelection?.paymentStatus}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingSelection(null)
+        }}
+        onConfirm={confirmUpcomingClasses}
+      />
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -394,6 +470,7 @@ export function FaceAttendanceDialog({
           )}
         </div>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

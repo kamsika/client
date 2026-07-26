@@ -174,7 +174,7 @@ export function AttendanceDayPanel({
                       <TableHead>Student</TableHead>
                       <TableHead>ID</TableHead>
                       <TableHead>Status</TableHead>
-                      {canMark ? <TableHead className="text-right">Action</TableHead> : null}
+                      {canMark && <TableHead className="text-right">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -195,7 +195,7 @@ export function AttendanceDayPanel({
                         <TableCell>
                           <Badge variant="destructive">Absent</Badge>
                         </TableCell>
-                        {canMark ? (
+                        {canMark && (
                           <TableCell className="text-right">
                             <Button
                               type="button"
@@ -207,7 +207,7 @@ export function AttendanceDayPanel({
                               {markingId === student.id ? "Saving..." : "Mark Present"}
                             </Button>
                           </TableCell>
-                        ) : null}
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>

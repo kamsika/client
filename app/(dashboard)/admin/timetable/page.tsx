@@ -1,6 +1,17 @@
-import { redirect } from "next/navigation"
+"use client"
 
-/** Timetable management is teacher-only. */
+import { DashboardShell } from "@/components/dashboard-shell"
+import { TimetableManager } from "@/components/timetable-manager"
+import { getAdminNav } from "@/lib/admin-nav"
+
 export default function AdminTimetablePage() {
-  redirect("/admin/dashboard")
+  return (
+    <DashboardShell
+      title="Timetable"
+      navItems={getAdminNav(false)}
+      allowedRoles={["institution_admin"]}
+    >
+      <TimetableManager />
+    </DashboardShell>
+  )
 }

@@ -6,6 +6,7 @@ import { Camera, QrCode, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import { releaseCameraMedia } from "@/lib/camera"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { getClassroomAttendance, markAttendanceByScan } from "@/services/attendance"
+import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
+import type { AttendanceSubjectOption } from "@/services/attendance"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
 import type { AttendanceRecord } from "@/types"
 
@@ -74,6 +77,7 @@ async function getCameraPermissionState(): Promise<PermissionState | "unknown"> 
 }
 
 type FacingMode = "environment" | "user"
+const QR_RESCAN_COOLDOWN_MS = 120_000
 
 async function startQrScanner(
   elementId: string,
@@ -134,6 +138,7 @@ async function startQrScanner(
     } catch (error) {
       lastError = error
       try {
+        releaseCameraMedia(document.getElementById(elementId))
         if (scanner.isScanning) {
           await scanner.stop()
         }
@@ -141,6 +146,7 @@ async function startQrScanner(
       } catch {
         // ignore cleanup errors between attempts
       }
+      releaseCameraMedia(document.getElementById(elementId))
     }
   }
 
@@ -156,7 +162,6 @@ export function QrAttendanceDialog({
   const readerId = `qr-reader-${classroomId}`
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const recordsRef = useRef<AttendanceRecord[]>([])
-  const markingRef = useRef(false)
 
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [studentsReady, setStudentsReady] = useState(false)
@@ -165,6 +170,12 @@ export function QrAttendanceDialog({
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [lastScan, setLastScan] = useState<string | null>(null)
   const [activeFacingMode, setActiveFacingMode] = useState<FacingMode>("environment")
+  const [pendingSelection, setPendingSelection] = useState<{
+    scannedId: string
+    studentName: string
+    options: AttendanceSubjectOption[]
+    paymentStatus?: "Pending" | "Paid" | "Overdue"
+  } | null>(null)
   const recentScansRef = useRef<Map<string, number>>(new Map())
 
   const loadStudents = useCallback(async () => {
@@ -182,27 +193,31 @@ export function QrAttendanceDialog({
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
     scannerRef.current = null
-    if (!scanner) return
+    const container = document.getElementById(readerId)
+
+    // Stop the actual MediaStream before waiting for html5-qrcode. This also
+    // handles cases where the library instance was already cleared.
+    releaseCameraMedia(container)
 
     try {
-      if (scanner.isScanning) {
+      if (scanner?.isScanning) {
         await scanner.stop()
       }
     } catch {
       // Scanner may already be stopped when the dialog closes.
     } finally {
       try {
-        scanner.clear()
+        scanner?.clear()
       } catch {
         // clear() throws if the element was already removed.
       }
+      releaseCameraMedia(document.getElementById(readerId) || container)
     }
-  }, [])
+  }, [readerId])
 
   const processScan = useCallback(
     async (rawValue: string) => {
-      if (markingRef.current) return
-
+      if (pendingSelection) return
       // Exact scanned QR text — never substitute another student's ID.
       const scannedId = rawValue.trim()
       if (!scannedId) return
@@ -211,33 +226,60 @@ export function QrAttendanceDialog({
       console.log("Sending student ID to API:", scannedId)
 
       const now = Date.now()
+      for (const [id, scannedAt] of recentScansRef.current) {
+        if (now - scannedAt >= QR_RESCAN_COOLDOWN_MS) {
+          recentScansRef.current.delete(id)
+        }
+      }
       const lastMarkedAt = recentScansRef.current.get(scannedId)
-      if (lastMarkedAt && now - lastMarkedAt < 3000) {
+      if (lastMarkedAt && now - lastMarkedAt < QR_RESCAN_COOLDOWN_MS) {
         return
       }
 
-      markingRef.current = true
+      // Lock only this QR value. Other student QR values can be processed
+      // immediately, even while this request is still in flight.
+      recentScansRef.current.set(scannedId, now)
       try {
         const result = await markAttendanceByScan(scannedId, classroomId, new Date().toISOString())
-        recentScansRef.current.set(scannedId, now)
-        const labeled = result.attendance.registration_no || scannedId
-        setLastScan(`${result.attendance.student_name || "Student"} (${labeled})`)
-        toast.success(
-          `Attendance marked as Present for ${result.attendance.student_name || "Student"} (${labeled})!`,
+        const attendance = result.attendance ?? result.data
+        const attendanceOptions =
+          result.attendanceOptions ?? result.attendance_options ?? []
+        if (attendanceOptions.length > 1) {
+          setPendingSelection({
+            scannedId,
+            studentName: result.studentName || attendance?.student_name || "Student",
+            options: attendanceOptions,
+            paymentStatus:
+              result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status,
+          })
+        }
+        if (!attendance || result.status === "NoClass") {
+          toast.message(result.message || "No timetable class is active for this student.")
+          return
+        }
+        const labeled = attendance.registration_no || scannedId
+        const paymentStatus =
+          result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status
+        setLastScan(
+          `${attendance.student_name || "Student"} (${labeled}) · Monthly fee: ${paymentStatus ?? "Pending"}`,
         )
+        if (result.status === "AlreadyMarked") {
+          toast.message(result.message || `Already marked for ${attendance.subject_name || "this class"}.`)
+        } else {
+          toast.success(
+            `Attendance marked as Present for ${attendance.student_name || "Student"} (${labeled})!`,
+          )
+        }
         await loadStudents()
       } catch (error) {
         if (isAlreadyScannedError(error)) {
-          recentScansRef.current.set(scannedId, now)
           toast.message(getApiErrorMessage(error, "Already scanned for today!"))
           return
         }
         toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
-      } finally {
-        markingRef.current = false
       }
     },
-    [classroomId, loadStudents],
+    [classroomId, loadStudents, pendingSelection],
   )
 
   const startScanner = useCallback(
@@ -266,6 +308,7 @@ export function QrAttendanceDialog({
     setCameraError(null)
     setActiveFacingMode("environment")
     setStudentsReady(false)
+    setPendingSelection(null)
     recentScansRef.current.clear()
     void stopScanner()
   }, [stopScanner])
@@ -296,11 +339,35 @@ export function QrAttendanceDialog({
     }
   }, [open, classroomId])
 
+  useEffect(() => {
+    return () => {
+      void stopScanner()
+    }
+  }, [stopScanner])
+
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
       resetDialogState()
     }
     onOpenChange(nextOpen)
+  }
+
+  async function confirmUpcomingClasses(selectedSubjects: string[]) {
+    if (!pendingSelection) return
+    try {
+      const result = await markAttendanceByScan(
+        pendingSelection.scannedId,
+        classroomId,
+        new Date().toISOString(),
+        selectedSubjects,
+      )
+      await loadStudents()
+      const newlyMarked = result.newlyMarkedSubjects ?? []
+      if (newlyMarked.length > 0) toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to confirm class attendance"))
+      throw error
+    }
   }
 
   async function handleEnableCamera() {
@@ -367,7 +434,18 @@ export function QrAttendanceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <>
+      <AttendanceSubjectSelectionDialog
+        open={Boolean(pendingSelection)}
+        studentName={pendingSelection?.studentName ?? "Student"}
+        options={pendingSelection?.options ?? []}
+        paymentStatus={pendingSelection?.paymentStatus}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingSelection(null)
+        }}
+        onConfirm={confirmUpcomingClasses}
+      />
+      <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -459,6 +537,7 @@ export function QrAttendanceDialog({
           </p>
         </div>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

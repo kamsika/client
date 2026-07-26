@@ -14,9 +14,9 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { ContinuousSubjectPicker } from "@/components/continuous-subject-picker"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
 import {
   Select,
   SelectContent,
@@ -39,7 +39,7 @@ import {
   stopFaceCamera,
   type FaceMatcherInstance,
 } from "@/lib/face-recognition"
-import { markKioskAttendance, type SelectableAttendanceSubject } from "@/services/attendance"
+import { markKioskAttendance, type AttendanceSubjectOption } from "@/services/attendance"
 import { listClassrooms } from "@/services/classroom"
 import { listFaceProfiles, type StudentFaceProfile } from "@/services/student-face"
 import type { Classroom } from "@/types"
@@ -60,25 +60,21 @@ interface KioskLogEntry {
   enrolledSubjects: string[]
   presentNowDetails: string[]
   alreadyMarkedDetails: string[]
+  paymentStatus?: "Pending" | "Paid" | "Overdue"
 }
 
 interface RecognizedStudent {
   studentId: number
   name: string
   registrationNo: string
-  grade?: string | null
-  classroomName?: string | null
-  /** present | already | noclass | mixed | select */
-  mode: "present" | "already" | "noclass" | "mixed" | "select"
+  /** present | already | noclass | mixed */
+  mode: "present" | "already" | "noclass" | "mixed"
   status: string
   distance: number
   enrolledSubjects: string[]
   presentNowDetails: string[]
   alreadyMarkedDetails: string[]
-  selectableSubjects: SelectableAttendanceSubject[]
-  scheduledSubjects: SelectableAttendanceSubject[]
-  continuousGroup: boolean
-  classroomId: number
+  paymentStatus?: "Pending" | "Paid" | "Overdue"
 }
 
 interface KioskAttendanceScreenProps {
@@ -152,8 +148,12 @@ export function KioskAttendanceScreen({
   const [scanning, setScanning] = useState(false)
 
   const [recognized, setRecognized] = useState<RecognizedStudent | null>(null)
-  const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([])
-  const [submittingSubjects, setSubmittingSubjects] = useState(false)
+  const [pendingSelection, setPendingSelection] = useState<{
+    studentId: number
+    studentName: string
+    options: AttendanceSubjectOption[]
+    paymentStatus?: "Pending" | "Paid" | "Overdue"
+  } | null>(null)
   const [log, setLog] = useState<KioskLogEntry[]>([])
   const [clock, setClock] = useState(() => formatClock(new Date()))
 
@@ -170,7 +170,6 @@ export function KioskAttendanceScreen({
     recentDetectionsRef.current.clear()
     setLog([])
     setRecognized(null)
-    setSelectedSubjectIds([])
   }, [classroomId])
 
   useEffect(() => {
@@ -248,7 +247,7 @@ export function KioskAttendanceScreen({
   }, [fixedClassroomId, rebuildMatcher])
 
   useEffect(() => {
-    if (!recognized || recognized.mode === "select") return
+    if (!recognized) return
     const timer = window.setTimeout(() => setRecognized(null), FEEDBACK_MS)
     return () => window.clearTimeout(timer)
   }, [recognized])
@@ -303,147 +302,11 @@ export function KioskAttendanceScreen({
     recentDetectionsRef.current.clear()
   }
 
-  const applyMarkResult = useCallback(
-    (args: {
-      studentId: number
-      name: string
-      registrationNo: string
-      distance: number
-      result: Awaited<ReturnType<typeof markKioskAttendance>>
-    }) => {
-      const { studentId, name, registrationNo, distance, result } = args
-      const enrolledSubjects = result.enrolledSubjects ?? result.enrolled_subjects ?? []
-      const newlyMarked = result.newlyMarkedSubjects ?? []
-      const alreadyMarked = result.alreadyMarkedSubjects ?? []
-      const presentNowDetails = (result.presentNowDetails ?? []).map(
-        (item) => item.label || `${item.subjectName ?? item.subject_name}`,
-      )
-      const alreadyMarkedDetails = (result.alreadyMarkedDetails ?? []).map(
-        (item) =>
-          item.label ||
-          `Already marked for ${item.subjectName ?? item.subject_name}.`,
-      )
-      const fallbackPresent =
-        presentNowDetails.length > 0
-          ? presentNowDetails
-          : newlyMarked.map((subject) => `${subject} - Present`)
-      const fallbackAlready =
-        alreadyMarkedDetails.length > 0
-          ? alreadyMarkedDetails
-          : alreadyMarked.map((subject) => `Already marked for ${subject}.`)
-
-      let mode: RecognizedStudent["mode"] = "present"
-      let statusLabel = "Present"
-      if (result.status === "NoClass") {
-        mode = "noclass"
-        statusLabel =
-          result.message ||
-          `No active class scheduled at this time for ${name}`
-      } else if (
-        result.status === "AlreadyMarked" ||
-        (newlyMarked.length === 0 && alreadyMarked.length > 0)
-      ) {
-        mode = "already"
-        statusLabel =
-          alreadyMarked.length === 1
-            ? `Already marked for ${alreadyMarked[0]}`
-            : "Already marked for selected class"
-      } else if (newlyMarked.length > 0 && alreadyMarked.length > 0) {
-        mode = "mixed"
-        statusLabel = `Present · ${newlyMarked.join(", ")}`
-      } else if (newlyMarked.length > 0) {
-        mode = "present"
-        statusLabel = `Present · ${newlyMarked.join(", ")}`
-      }
-
-      setRecognized({
-        studentId,
-        name,
-        registrationNo,
-        grade: result.grade ?? null,
-        classroomName: result.classroomName ?? result.classroom_name ?? null,
-        mode,
-        status: statusLabel,
-        distance,
-        enrolledSubjects,
-        presentNowDetails: fallbackPresent,
-        alreadyMarkedDetails: fallbackAlready,
-        selectableSubjects: [],
-        scheduledSubjects: result.scheduledSubjects ?? result.scheduled_subjects ?? [],
-        continuousGroup: false,
-        classroomId: classroomIdRef.current || 0,
-      })
-      setSelectedSubjectIds([])
-
-      if (mode === "noclass") {
-        toast.message(
-          result.message ||
-            `No active class scheduled at this time for ${name}`,
-        )
-        return
-      }
-      if (mode === "already") {
-        toast.message(fallbackAlready[0] || statusLabel)
-        return
-      }
-
-      playSuccessChime()
-      if (newlyMarked.length > 0) toast.success(`Marked: ${newlyMarked.join(", ")}`)
-      if (alreadyMarked.length > 0) toast.message(fallbackAlready.join(" "))
-
-      setLog((prev) =>
-        [
-          {
-            id: `${studentId}-${Date.now()}`,
-            studentId,
-            name,
-            registrationNo,
-            status: statusLabel,
-            timeLabel: formatClock(new Date()),
-            distance,
-            enrolledSubjects,
-            presentNowDetails: fallbackPresent,
-            alreadyMarkedDetails: fallbackAlready,
-          },
-          ...prev,
-        ].slice(0, 40),
-      )
-    },
-    [],
-  )
-
-  const submitSelectedSubjects = useCallback(async () => {
-    if (!recognized || recognized.mode !== "select") return
-    if (selectedSubjectIds.length === 0) {
-      toast.error("Select at least one subject")
-      return
-    }
-
-    setSubmittingSubjects(true)
-    try {
-      const result = await markKioskAttendance({
-        studentId: recognized.studentId,
-        classroomId: recognized.classroomId,
-        selectedSubjectIds,
-      })
-      applyMarkResult({
-        studentId: recognized.studentId,
-        name: recognized.name,
-        registrationNo: recognized.registrationNo,
-        distance: recognized.distance,
-        result,
-      })
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to mark selected subjects"))
-    } finally {
-      setSubmittingSubjects(false)
-    }
-  }, [applyMarkResult, recognized, selectedSubjectIds])
-
   const recordMatch = useCallback(async (studentId: number, distance: number) => {
     const now = Date.now()
     const cooldownWindow = cooldownMsRef.current
 
+    // Per-student cooldown only — do NOT block the rest of the day.
     if (isWithinCooldown(recentDetectionsRef.current, studentId, now, cooldownWindow)) {
       return
     }
@@ -467,86 +330,123 @@ export function KioskAttendanceScreen({
     markingRef.current = true
 
     try {
-      // Phase 1: fetch selectable continuous/current subjects (no mark yet).
+      const timestamp = new Date().toISOString()
       const result = await markKioskAttendance({
         studentId,
         classroomId: activeClassroomId,
+        timestamp,
       })
+
+      const enrolledSubjects =
+        result.enrolledSubjects ?? result.enrolled_subjects ?? []
+      const newlyMarked = result.newlyMarkedSubjects ?? []
+      const alreadyMarked = result.alreadyMarkedSubjects ?? []
+      const presentNowDetails = (result.presentNowDetails ?? []).map(
+        (item) => item.label || `${item.subjectName ?? item.subject_name}`,
+      )
+      const alreadyMarkedDetails = (result.alreadyMarkedDetails ?? []).map(
+        (item) =>
+          item.label ||
+          `Already marked for ${item.subjectName ?? item.subject_name}.`,
+      )
+      const attendanceOptions =
+        result.attendanceOptions ?? result.attendance_options ?? []
+      const paymentStatus =
+        result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status
+
+      // Fallback labels when older API shape is returned.
+      const fallbackPresent =
+        presentNowDetails.length > 0
+          ? presentNowDetails
+          : newlyMarked.map((subject) => `${subject} - Present`)
+      const fallbackAlready =
+        alreadyMarkedDetails.length > 0
+          ? alreadyMarkedDetails
+          : alreadyMarked.map((subject) => `Already marked for ${subject}.`)
 
       const displayName = result.studentName || name
       const displayReg = result.registrationNo || registrationNo
-      const enrolledSubjects = result.enrolledSubjects ?? result.enrolled_subjects ?? []
-      const selectable =
-        result.selectableSubjects ?? result.selectable_subjects ?? []
-      const scheduled =
-        result.scheduledSubjects ?? result.scheduled_subjects ?? []
-      const needsSelection =
-        result.status === "SelectSubjects" ||
-        result.requiresSelection ||
-        result.requires_selection
 
-      if (result.status === "NoClass" || selectable.length === 0) {
-        const noClassMessage =
-          result.message ||
-          `No active class scheduled at this time for ${displayName}`
-        setRecognized({
-          studentId,
-          name: displayName,
-          registrationNo: displayReg,
-          grade: result.grade ?? null,
-          classroomName: result.classroomName ?? result.classroom_name ?? null,
-          mode: "noclass",
-          status: noClassMessage,
-          distance,
-          enrolledSubjects,
-          presentNowDetails: [],
-          alreadyMarkedDetails: [],
-          selectableSubjects: [],
-          scheduledSubjects: scheduled,
-          continuousGroup: false,
-          classroomId: activeClassroomId,
-        })
-        setSelectedSubjectIds([])
-        toast.message(noClassMessage)
-        return
+      let mode: RecognizedStudent["mode"] = "present"
+      let statusLabel = "Present"
+      if (result.status === "NoClass") {
+        mode = "noclass"
+        statusLabel = "No class now"
+      } else if (result.status === "AlreadyMarked" || (newlyMarked.length === 0 && alreadyMarked.length > 0)) {
+        mode = "already"
+        statusLabel =
+          alreadyMarked.length === 1
+            ? `Already marked for ${alreadyMarked[0]}`
+            : "Already marked for current class"
+      } else if (newlyMarked.length > 0 && alreadyMarked.length > 0) {
+        mode = "mixed"
+        statusLabel = `Present · ${newlyMarked.join(", ")}`
+      } else if (newlyMarked.length > 0) {
+        mode = "present"
+        statusLabel = `Present · ${newlyMarked.join(", ")}`
       }
 
-      if (needsSelection) {
-        const defaults = selectable
-          .filter((subject) => subject.defaultChecked !== false)
-          .map((subject) => subject.id ?? subject.subjectId ?? 0)
-          .filter((id) => id > 0)
-        setSelectedSubjectIds(defaults.length > 0 ? defaults : selectable
-          .map((subject) => subject.id ?? subject.subjectId ?? 0)
-          .filter((id) => id > 0))
-        setRecognized({
-          studentId,
-          name: displayName,
-          registrationNo: displayReg,
-          grade: result.grade ?? null,
-          classroomName: result.classroomName ?? result.classroom_name ?? null,
-          mode: "select",
-          status: result.continuousGroup ? "Select continuous classes" : "Confirm class",
-          distance,
-          enrolledSubjects,
-          presentNowDetails: [],
-          alreadyMarkedDetails: [],
-          selectableSubjects: selectable,
-          scheduledSubjects: scheduled,
-          continuousGroup: Boolean(result.continuousGroup ?? result.continuous_group),
-          classroomId: activeClassroomId,
-        })
-        setScanning(false)
-        return
-      }
-
-      applyMarkResult({
+      setRecognized({
         studentId,
         name: displayName,
         registrationNo: displayReg,
+        mode,
+        status: statusLabel,
         distance,
-        result,
+        enrolledSubjects,
+        presentNowDetails: fallbackPresent,
+        alreadyMarkedDetails: fallbackAlready,
+        paymentStatus,
       })
+
+        if (attendanceOptions.length > 1) {
+          setScanning(false)
+          setPendingSelection({
+          studentId,
+          studentName: displayName,
+          options: attendanceOptions,
+          paymentStatus,
+        })
+      }
+
+      if (mode === "noclass") {
+        toast.message(
+          `${displayName}: no timetable class at this time. Enrolled subjects shown only.`,
+        )
+        return
+      }
+
+      if (mode === "already") {
+        toast.message(
+          fallbackAlready[0] ||
+            `Already marked for ${alreadyMarked.join(", ") || "current class"}.`,
+        )
+        return
+      }
+
+      playSuccessChime()
+      if (newlyMarked.length > 0) {
+        toast.success(`Marked: ${newlyMarked.join(", ")}`)
+      }
+      if (alreadyMarked.length > 0) {
+        toast.message(fallbackAlready.join(" "))
+      }
+
+      setLog((prev) => [
+        {
+          id: `${studentId}-${Date.now()}`,
+          studentId,
+          name: displayName,
+          registrationNo: displayReg,
+          status: statusLabel,
+          timeLabel: formatClock(new Date()),
+          distance,
+          enrolledSubjects,
+          presentNowDetails: fallbackPresent,
+          alreadyMarkedDetails: fallbackAlready,
+        },
+        ...prev,
+      ].slice(0, 40))
     } catch (error) {
       if (isAlreadyScannedError(error)) {
         const message = getApiErrorMessage(error, "Already marked for current class.")
@@ -560,10 +460,6 @@ export function KioskAttendanceScreen({
           enrolledSubjects: [],
           presentNowDetails: [],
           alreadyMarkedDetails: [message.endsWith(".") ? message : `${message}.`],
-          selectableSubjects: [],
-          scheduledSubjects: [],
-          continuousGroup: false,
-          classroomId: activeClassroomId,
         })
         toast.message(message)
       } else {
@@ -573,18 +469,48 @@ export function KioskAttendanceScreen({
     } finally {
       markingRef.current = false
     }
-  }, [applyMarkResult])
+  }, [])
+
+  async function confirmUpcomingClasses(selectedSubjects: string[]) {
+    if (!pendingSelection) return
+    const activeClassroomId = classroomIdRef.current
+    if (!activeClassroomId) {
+      toast.error("Select a classroom to confirm attendance")
+      return
+    }
+
+    try {
+      const result = await markKioskAttendance({
+        studentId: pendingSelection.studentId,
+        classroomId: activeClassroomId,
+        timestamp: new Date().toISOString(),
+        selectedSubjects,
+      })
+      const newlyMarked = result.newlyMarkedSubjects ?? []
+      if (newlyMarked.length > 0) {
+        toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
+      }
+      const attendance = result.attendance ?? result.data
+      if (attendance) {
+        setRecognized((current) =>
+          current
+            ? {
+                ...current,
+                status: `Present · ${newlyMarked.join(", ") || "confirmed"}`,
+              }
+            : current,
+        )
+      }
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to confirm class attendance"))
+      throw error
+    }
+  }
 
   // Continuous detection loop (~300ms).
   useEffect(() => {
-    if (
-      !cameraActive ||
-      !scanning ||
-      !modelsReady ||
-      !matcherReady ||
-      recognized?.mode === "select"
-    ) {
-      if (canvasRef.current && recognized?.mode === "select") clearFaceOverlay(canvasRef.current)
+    if (!cameraActive || !scanning || !modelsReady || !matcherReady) {
+      if (canvasRef.current) clearFaceOverlay(canvasRef.current)
       return
     }
 
@@ -660,10 +586,23 @@ export function KioskAttendanceScreen({
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [cameraActive, scanning, modelsReady, matcherReady, recognized?.mode, recordMatch])
+  }, [cameraActive, scanning, modelsReady, matcherReady, recordMatch])
 
   return (
     <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-4 lg:flex-row">
+      <AttendanceSubjectSelectionDialog
+        open={Boolean(pendingSelection)}
+        studentName={pendingSelection?.studentName ?? "Student"}
+        options={pendingSelection?.options ?? []}
+        paymentStatus={pendingSelection?.paymentStatus}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingSelection(null)
+            if (cameraActive) setScanning(true)
+          }
+        }}
+        onConfirm={confirmUpcomingClasses}
+      />
       {/* Main kiosk stage */}
       <section className="relative flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-2xl bg-zinc-950 text-white shadow-xl">
         <div className="absolute inset-0">
@@ -782,36 +721,24 @@ export function KioskAttendanceScreen({
         )}
 
         {/* Recognition feedback card */}
-        {recognized ? (
-          <div
-            className={
-              recognized.mode === "select" ||
-              (recognized.mode === "noclass" &&
-                (recognized.scheduledSubjects?.length ?? 0) > 0)
-                ? "pointer-events-auto absolute inset-x-0 bottom-20 z-20 flex justify-center px-4"
-                : "pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4"
-            }
-          >
+        {recognized && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
             <div
-              className={
+              className={`flex w-full max-w-lg flex-col gap-3 rounded-2xl border px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300 ${
                 recognized.mode === "already"
-                  ? "flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-amber-400/40 bg-amber-950/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
+                  ? "border-amber-400/40 bg-amber-950/90"
                   : recognized.mode === "noclass"
-                    ? "flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-white/20 bg-zinc-900/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
-                    : recognized.mode === "select"
-                      ? "flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-sky-400/40 bg-zinc-950/95 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
-                      : "flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-950/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300"
-              }
+                    ? "border-white/20 bg-zinc-900/90"
+                    : "border-emerald-400/40 bg-emerald-950/90"
+              }`}
             >
               <div className="flex items-center gap-4">
                 <div
-                  className={
+                  className={`flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-bold ${
                     recognized.mode === "already"
-                      ? "flex size-16 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xl font-bold text-amber-950"
-                      : recognized.mode === "select"
-                        ? "flex size-16 shrink-0 items-center justify-center rounded-full bg-sky-400 text-xl font-bold text-sky-950"
-                        : "flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-xl font-bold text-emerald-950"
-                  }
+                      ? "bg-amber-400 text-amber-950"
+                      : "bg-emerald-400 text-emerald-950"
+                  }`}
                 >
                   {initials(recognized.name)}
                 </div>
@@ -822,25 +749,13 @@ export function KioskAttendanceScreen({
                   <p className="truncate text-sm text-white/70">
                     ID: {recognized.registrationNo}
                   </p>
-                  {(recognized.grade || recognized.classroomName) ? (
-                    <p className="truncate text-xs text-white/55">
-                      {[
-                        recognized.grade ? `Grade ${recognized.grade}` : null,
-                        recognized.classroomName,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  ) : null}
                 </div>
                 <Badge
-                  className={
+                  className={`shrink-0 gap-1 border-0 ${
                     recognized.mode === "already"
-                      ? "shrink-0 gap-1 border-0 bg-amber-400 text-amber-950"
-                      : recognized.mode === "select"
-                        ? "shrink-0 gap-1 border-0 bg-sky-400 text-sky-950"
-                        : "shrink-0 gap-1 border-0 bg-emerald-400 text-emerald-950"
-                  }
+                      ? "bg-amber-400 text-amber-950"
+                      : "bg-emerald-400 text-emerald-950"
+                  }`}
                 >
                   {recognized.mode === "already" ? (
                     <AlertTriangle className="size-3.5" />
@@ -851,7 +766,7 @@ export function KioskAttendanceScreen({
                 </Badge>
               </div>
 
-              {recognized.enrolledSubjects.length > 0 ? (
+              {recognized.enrolledSubjects.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
                     Enrolled Subjects
@@ -864,44 +779,24 @@ export function KioskAttendanceScreen({
                     ))}
                   </div>
                 </div>
-              ) : null}
+              )}
 
-              {recognized.mode === "select" && recognized.selectableSubjects.length > 0 ? (
-                <ContinuousSubjectPicker
-                  subjects={recognized.selectableSubjects}
-                  scheduledSubjects={recognized.scheduledSubjects ?? []}
-                  selectedIds={selectedSubjectIds}
-                  onChange={setSelectedSubjectIds}
-                  continuousGroup={recognized.continuousGroup}
-                  submitting={submittingSubjects}
-                  onSubmit={() => void submitSelectedSubjects()}
-                  onCancel={() => {
-                    setRecognized(null)
-                    setSelectedSubjectIds([])
-                    setScanning(true)
-                  }}
-                  className="border-white/15 bg-black/40 text-white shadow-none [&_p]:text-white/70 [&_.text-muted-foreground]:text-white/60"
-                />
-              ) : null}
+              {recognized.paymentStatus && (
+                <div className="flex items-center gap-2 text-sm text-white/80">
+                  <span className="text-white/60">Monthly fee:</span>
+                  <Badge
+                    className={
+                      recognized.paymentStatus === "Paid"
+                        ? "border-0 bg-emerald-400 text-emerald-950"
+                        : "border-0 bg-amber-400 text-amber-950"
+                    }
+                  >
+                    {recognized.paymentStatus}
+                  </Badge>
+                </div>
+              )}
 
-              {recognized.mode === "noclass" &&
-              (recognized.scheduledSubjects?.length ?? 0) > 0 ? (
-                <ContinuousSubjectPicker
-                  subjects={[]}
-                  scheduledSubjects={recognized.scheduledSubjects ?? []}
-                  selectedIds={[]}
-                  onChange={() => undefined}
-                  submitting={false}
-                  onSubmit={() => undefined}
-                  onCancel={() => {
-                    setRecognized(null)
-                    setScanning(true)
-                  }}
-                  className="border-white/15 bg-black/40 text-white shadow-none [&_p]:text-white/70 [&_.text-muted-foreground]:text-white/60"
-                />
-              ) : null}
-
-              {recognized.presentNowDetails.length > 0 ? (
+              {recognized.presentNowDetails.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
                     Marked Today / Present Now
@@ -915,9 +810,9 @@ export function KioskAttendanceScreen({
                     ))}
                   </ul>
                 </div>
-              ) : null}
+              )}
 
-              {recognized.alreadyMarkedDetails.length > 0 ? (
+              {recognized.alreadyMarkedDetails.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium tracking-wide text-amber-200/80 uppercase">
                     Already Marked Warning
@@ -931,10 +826,10 @@ export function KioskAttendanceScreen({
                     ))}
                   </ul>
                 </div>
-              ) : null}
+              )}
             </div>
           </div>
-        ) : null}
+        )}
 
         {/* Bottom controls when live */}
         {cameraActive && (

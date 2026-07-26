@@ -1,3 +1,5 @@
+import { stopCameraVideo } from "@/lib/camera"
+
 // Local weights downloaded via `npm run download-models`; CDN is a fallback
 // in case the local files haven't been fetched yet.
 const LOCAL_MODEL_BASE = "/models"
@@ -284,14 +286,22 @@ export function matchFaceDescriptor(
 async function startCameraStream(video: HTMLVideoElement): Promise<MediaStream> {
   const attempts: MediaTrackConstraints[] = [{}, { facingMode: "user" }, { facingMode: "environment" }]
 
+  // Restarting a camera must release the previous stream first. Otherwise the
+  // old stream is lost when srcObject is replaced and keeps the camera busy.
+  stopCameraVideo(video)
+
   let lastError: unknown = null
   for (const videoConstraints of attempts) {
+    let stream: MediaStream | null = null
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints })
       video.srcObject = stream
       await video.play()
       return stream
     } catch (error) {
+      if (stream) {
+        stopCameraVideo(video)
+      }
       lastError = error
     }
   }
@@ -304,11 +314,7 @@ export async function startFaceCamera(video: HTMLVideoElement): Promise<MediaStr
 }
 
 export function stopFaceCamera(video: HTMLVideoElement) {
-  const stream = video.srcObject
-  if (stream instanceof MediaStream) {
-    stream.getTracks().forEach((track) => track.stop())
-  }
-  video.srcObject = null
+  stopCameraVideo(video)
 }
 
 export function getCameraErrorMessage(error: unknown): string {

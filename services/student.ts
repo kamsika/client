@@ -45,6 +45,26 @@ export async function updateStudentSubjects(studentId: number, enrolledSubjects:
   return data
 }
 
+export async function updateStudentPaymentStatus(
+  studentId: number,
+  paymentStatus: "Pending" | "Paid" | "Overdue",
+  billingPeriod?: string,
+) {
+  const { data } = await apiClient.patch<{
+    success: boolean
+    payment: {
+      billing_period: string
+      payment_status: "Pending" | "Paid" | "Overdue"
+      amount_due: number | null
+      paid_at: string | null
+    }
+  }>(`/api/students/${studentId}/payment-status`, {
+    paymentStatus,
+    billingPeriod,
+  })
+  return data.payment
+}
+
 export async function listStudents(search?: string) {
   const { data } = await apiClient.get<{ students: Student[]; count?: number; search?: string | null }>(
     "/api/students",
