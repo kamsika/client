@@ -1,67 +1,64 @@
 import type { LucideIcon } from "lucide-react"
 import {
-  CalendarDays,
-  ClipboardCheck,
+  ClipboardList,
   LayoutDashboard,
   QrCode,
-  ScanFace,
+  UserRound,
   Users,
 } from "lucide-react"
 
 export type TeacherNavItem = {
   href: string
   label: string
+  description?: string
   /** When true, only the exact path is treated as active (not nested routes). */
   exact?: boolean
   icon?: LucideIcon
 }
 
-/** Sticky feature tabs for the teacher workspace. */
-export function getTeacherFeatureNav(): TeacherNavItem[] {
+/** Primary left-sidebar navigation for the Teacher Dashboard. */
+export function getTeacherNav(): TeacherNavItem[] {
   return [
     {
       href: "/teacher/dashboard",
-      label: "Overview",
+      label: "Dashboard",
+      description: "Today's overview",
       icon: LayoutDashboard,
       exact: true,
     },
     {
-      href: "/teacher/dashboard/students",
-      label: "Students",
-      icon: Users,
-    },
-    {
       href: "/teacher/dashboard/qr-scanner",
       label: "QR Scanner",
+      description: "Mark by QR code",
       icon: QrCode,
     },
     {
-      href: "/teacher/dashboard/kiosk",
-      label: "Face Attendance",
-      icon: ScanFace,
+      href: "/teacher/dashboard/attendance",
+      label: "Attendance History",
+      description: "Roster & status",
+      icon: ClipboardList,
     },
     {
-      href: "/teacher/dashboard/manual",
-      label: "Manual Attendance",
-      icon: ClipboardCheck,
+      href: "/teacher/dashboard/students",
+      label: "Students",
+      description: "Subjects & profiles",
+      icon: Users,
     },
     {
-      href: "/teacher/dashboard/timetable",
-      label: "Timetable",
-      icon: CalendarDays,
+      href: "/teacher/dashboard/profile",
+      label: "Profile",
+      description: "Your account",
+      icon: UserRound,
     },
   ]
 }
 
-/** Secondary shell links (shown alongside feature tabs). */
+/** @deprecated Use getTeacherNav() — kept for older imports. */
+export function getTeacherFeatureNav(): TeacherNavItem[] {
+  return getTeacherNav()
+}
+
+/** @deprecated Use getTeacherNav() — kept for older imports. */
 export function getTeacherShellNav(): TeacherNavItem[] {
-  return [
-    { href: "/teacher/attendance", label: "Full Roster", exact: true },
-    { href: "/teacher/attendance/reports", label: "Reports" },
-  ]
-}
-
-/** Combined nav used by DashboardShell on teacher pages. */
-export function getTeacherNav(): TeacherNavItem[] {
-  return [...getTeacherFeatureNav(), ...getTeacherShellNav()]
+  return getTeacherNav()
 }

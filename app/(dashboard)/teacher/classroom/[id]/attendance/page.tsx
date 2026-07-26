@@ -112,7 +112,7 @@ export default function ClassroomAttendancePage() {
   }
 
   return (
-    <TeacherShell title="Live Attendance">
+    <TeacherShell title="Live Attendance" description="Classroom attendance session">
       <div className="grid gap-6">
         <Card>
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

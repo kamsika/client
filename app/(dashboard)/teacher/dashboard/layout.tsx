@@ -7,5 +7,5 @@ export default function TeacherDashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  return <TeacherShell title="Teacher">{children}</TeacherShell>
+  return <TeacherShell>{children}</TeacherShell>
 }

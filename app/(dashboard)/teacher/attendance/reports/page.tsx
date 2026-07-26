@@ -5,7 +5,7 @@ import { TeacherShell } from "@/components/teacher-shell"
 
 export default function TeacherAttendanceReportsPage() {
   return (
-    <TeacherShell title="Attendance Reports">
+    <TeacherShell title="Attendance Reports" description="Analytics and exports">
       <AttendanceReportsPanel />
     </TeacherShell>
   )

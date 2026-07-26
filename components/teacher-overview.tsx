@@ -2,13 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Activity, Loader2, RefreshCw, Users } from "lucide-react"
+import {
+  Activity,
+  ClipboardList,
+  Loader2,
+  QrCode,
+  RefreshCw,
+  UserRoundX,
+  Users,
+  UserCheck,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { formatAttendanceDayLabel, formatLocalTime, localTodayISO } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
@@ -17,6 +25,15 @@ import type { TeacherAttendanceOverview, TeacherAttendanceStudentRow } from "@/t
 
 const POLL_MS = 8000
 const RECENT_LIMIT = 8
+
+const cardShell =
+  "rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)]"
+
+const outlineBtn =
+  "border-[#A2D4ED] text-[#0047AB] transition hover:bg-[#ABD2F2]/40"
+
+const primaryBtn =
+  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
 
 function initials(name: string | null | undefined, fallback: string) {
   const source = (name || fallback).trim()
@@ -46,30 +63,55 @@ function statusBadgeClass(status: TeacherAttendanceStudentRow["status"]) {
   return "border-rose-200 bg-rose-50 text-rose-800"
 }
 
-function MetricCard({
+function SummaryCard({
   label,
   value,
-  accent,
+  icon: Icon,
+  tone,
   loading,
 }: {
   label: string
   value: number | null
-  accent: string
+  icon: typeof Users
+  tone: "blue" | "gold" | "green" | "rose"
   loading: boolean
 }) {
+  const tones = {
+    blue: "bg-[#ABD2F2]/35 text-[#0047AB]",
+    gold: "bg-[#F9BF15]/25 text-[#b45309]",
+    green: "bg-emerald-50 text-emerald-700",
+    rose: "bg-rose-50 text-rose-700",
+  }
+
   return (
-    <div className={cn("rounded-xl border px-4 py-4 shadow-none", accent)}>
-      <p className="text-xs font-medium tracking-wide uppercase opacity-80">{label}</p>
-      {loading ? (
-        <div className="mt-2 h-8 w-16 animate-pulse rounded bg-black/10" />
-      ) : (
-        <p className="mt-1 text-3xl font-semibold tabular-nums">{value ?? 0}</p>
-      )}
+    <div className={cn(cardShell, "p-5")}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-[#0047AB]/70 uppercase">
+            {label}
+          </p>
+          {loading ? (
+            <div className="mt-2 h-9 w-16 animate-pulse rounded-lg bg-[#A2D4ED]/30" />
+          ) : (
+            <p className="mt-1 text-3xl font-semibold tabular-nums text-[#05082E]">
+              {value ?? 0}
+            </p>
+          )}
+        </div>
+        <span
+          className={cn(
+            "inline-flex size-10 items-center justify-center rounded-xl",
+            tones[tone],
+          )}
+        >
+          <Icon className="size-5" />
+        </span>
+      </div>
     </div>
   )
 }
 
-/** High-level teacher home: summary cards + recent check-ins only. */
+/** High-level teacher home: summary cards + recent check-ins. */
 export function TeacherOverview() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -109,6 +151,9 @@ export function TeacherOverview() {
   }, [load])
 
   const summary = overview?.summary
+  const presentTotal = summary
+    ? summary.presentCount + (summary.lateCount ?? 0)
+    : null
 
   const recentActivity = useMemo(() => {
     const students = overview?.students ?? []
@@ -123,18 +168,21 @@ export function TeacherOverview() {
   }, [overview?.students])
 
   return (
-    <div className="grid gap-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-1">
-          <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
-          <p className="text-muted-foreground text-sm">
-            Today&apos;s attendance summary for {formatAttendanceDayLabel(today)}.
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-[#05082E]">
+            Dashboard Overview
+          </h2>
+          <p className="text-sm text-[#0047AB]/75">
+            Today&apos;s attendance for {formatAttendanceDayLabel(today)}.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
+            className={outlineBtn}
             disabled={loading || refreshing}
             onClick={() => void load()}
           >
@@ -145,87 +193,101 @@ export function TeacherOverview() {
             )}
             Refresh
           </Button>
-          <Link href="/teacher/attendance">
-            <Button type="button" variant="secondary">
-              <Users className="size-4" />
-              Full roster
+          <Link href="/teacher/dashboard/qr-scanner">
+            <Button type="button" className={primaryBtn}>
+              <QrCode className="size-4" />
+              Open QR Scanner
             </Button>
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
           label="Total Students"
           value={summary?.totalStudents ?? null}
-          accent="border-sky-200 bg-sky-50 text-sky-950"
+          icon={Users}
+          tone="blue"
           loading={loading}
         />
-        <MetricCard
-          label="Present"
-          value={
-            summary ? summary.presentCount + (summary.lateCount ?? 0) : null
-          }
-          accent="border-emerald-200 bg-emerald-50 text-emerald-950"
+        <SummaryCard
+          label="Today's Attendance"
+          value={presentTotal}
+          icon={ClipboardList}
+          tone="gold"
           loading={loading}
         />
-        <MetricCard
-          label="Absent"
+        <SummaryCard
+          label="Present Count"
+          value={presentTotal}
+          icon={UserCheck}
+          tone="green"
+          loading={loading}
+        />
+        <SummaryCard
+          label="Absent Count"
           value={summary?.absentCount ?? null}
-          accent="border-rose-200 bg-rose-50 text-rose-950"
+          icon={UserRoundX}
+          tone="rose"
           loading={loading}
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="size-4" />
+      <div className={cn(cardShell, "overflow-hidden")}>
+        <div className="border-b border-[#A2D4ED]/40 px-5 py-4">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-[#05082E]">
+            <Activity className="size-4 text-[#E88D1D]" />
             Recent activity
-          </CardTitle>
-          <CardDescription>
-            Latest check-ins from today. Use the feature tabs above for scanning and marking.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </h3>
+          <p className="text-sm text-[#0047AB]/75">
+            Latest check-ins from today. Use QR Scanner to mark more students.
+          </p>
+        </div>
+        <div className="p-5">
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 rounded-lg border px-3 py-3"
+                  className="flex items-center gap-3 rounded-xl border border-[#A2D4ED]/40 bg-[#f8fbfe] px-3 py-3"
                 >
-                  <div className="bg-muted h-9 w-9 animate-pulse rounded-full" />
+                  <div className="size-9 animate-pulse rounded-full bg-[#A2D4ED]/40" />
                   <div className="flex-1 space-y-2">
-                    <div className="bg-muted h-3 w-1/3 animate-pulse rounded" />
-                    <div className="bg-muted h-3 w-1/5 animate-pulse rounded" />
+                    <div className="h-3 w-1/3 animate-pulse rounded bg-[#A2D4ED]/40" />
+                    <div className="h-3 w-1/5 animate-pulse rounded bg-[#A2D4ED]/30" />
                   </div>
                 </div>
               ))}
             </div>
           ) : recentActivity.length === 0 ? (
-            <div className="text-muted-foreground flex min-h-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 text-center text-sm">
-              <Activity className="size-8 opacity-40" />
-              <p className="font-medium text-foreground">No check-ins yet today</p>
-              <p>Mark attendance from QR Scanner, Face Attendance, or Manual Attendance.</p>
+            <div className="flex min-h-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#A2D4ED]/60 bg-[#f8fbfe] px-6 text-center text-sm text-[#0047AB]/75">
+              <Activity className="size-8 text-[#A2D4ED]" />
+              <p className="font-medium text-[#05082E]">No check-ins yet today</p>
+              <p>Open QR Scanner to start marking attendance.</p>
+              <Link href="/teacher/dashboard/qr-scanner" className="mt-2">
+                <Button type="button" size="sm" className={primaryBtn}>
+                  <QrCode className="size-4" />
+                  Scan now
+                </Button>
+              </Link>
             </div>
           ) : (
-            <ul className="divide-y rounded-xl border">
+            <ul className="divide-y divide-[#A2D4ED]/30 overflow-hidden rounded-xl border border-[#A2D4ED]/45 bg-white">
               {recentActivity.map((student) => (
                 <li
                   key={`${student.studentId}-${student.timestamp}`}
-                  className="flex items-center gap-3 px-3 py-3"
+                  className="flex items-center gap-3 px-3 py-3 transition hover:bg-[#A2D4ED]/10"
                 >
                   <Avatar size="default">
-                    <AvatarFallback className="bg-sky-100 font-semibold text-sky-900">
+                    <AvatarFallback className="bg-[#ABD2F2]/50 font-semibold text-[#0047AB]">
                       {initials(student.fullName, student.registrationNo)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">
+                    <p className="truncate font-medium text-[#05082E]">
                       {student.fullName || "Unnamed student"}
                     </p>
-                    <p className="text-muted-foreground truncate text-xs">
+                    <p className="truncate text-xs text-[#0047AB]/75">
                       {student.registrationNo}
                       {student.classroomName ? ` · ${student.classroomName}` : ""}
                     </p>
@@ -236,15 +298,15 @@ export function TeacherOverview() {
                   >
                     {student.status}
                   </Badge>
-                  <span className="text-muted-foreground w-20 shrink-0 text-right font-mono text-xs tabular-nums">
+                  <span className="w-20 shrink-0 text-right font-mono text-xs tabular-nums text-[#0047AB]/70">
                     {formatCheckInTime(student.timestamp)}
                   </span>
                 </li>
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
