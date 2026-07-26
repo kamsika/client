@@ -85,8 +85,12 @@ export async function markKioskAttendance(payload: {
     success: true
     status: "Present"
     message: string
+    autoMarkedSubjects?: string[]
+    newlyMarkedSubjects?: string[]
+    alreadyMarkedSubjects?: string[]
     data: Attendance
     attendance: Attendance
+    records?: Attendance[]
   }>(
     "/api/attendance",
     {
