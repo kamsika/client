@@ -54,6 +54,8 @@ export interface Attendance {
   date: string
   arrival_time: string | null
   status: "Present" | "Absent" | "Late"
+  subject_name?: string | null
+  subjectName?: string | null
   marked_by: number | null
   student_name: string | null
   registration_no: string | null
@@ -142,6 +144,27 @@ export interface TeacherAttendanceOverview {
     lateCount: number
   }
   students: TeacherAttendanceStudentRow[]
+}
+
+export interface TimetableSlot {
+  id: number
+  tenant_id: number
+  tenantId: number
+  classroom_id: number | null
+  classroomId: number | null
+  student_id: number | null
+  studentId: number | null
+  day_of_week: string
+  dayOfWeek: string
+  subject_name: string
+  subjectName: string
+  start_time: string
+  startTime: string
+  end_time: string
+  endTime: string
+  classroom_name?: string | null
+  student_name?: string | null
+  registration_no?: string | null
 }
 
 export interface StudyLog {
