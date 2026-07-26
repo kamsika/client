@@ -136,19 +136,25 @@ export async function scanCenterAttendance(payload: {
   scannedStudentId: string
   classroomId?: number
   selectedSubjects?: string[]
+  selectedSubjectIds?: number[]
 }) {
   if (!payload.scannedStudentId?.trim()) {
     throw new Error("Invalid QR code")
   }
-  if (!payload.classroomId) {
-    throw new Error("Select a classroom before scanning")
+  if (
+    !(payload.selectedSubjectIds && payload.selectedSubjectIds.length > 0) &&
+    !(payload.selectedSubjects && payload.selectedSubjects.length > 0)
+  ) {
+    throw new Error("Select at least one subject")
   }
 
   console.log(
     "[QR] Sending student ID to API:",
     payload.scannedStudentId,
-    "classroom:",
-    payload.classroomId,
+    "subjects:",
+    payload.selectedSubjects,
+    "subjectIds:",
+    payload.selectedSubjectIds,
   )
   const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", {
     student_id: payload.scannedStudentId.trim(),
@@ -157,6 +163,7 @@ export async function scanCenterAttendance(payload: {
     scanned_at: new Date().toISOString(),
     prevent_duplicate: true,
     selected_subjects: payload.selectedSubjects,
+    selected_subject_ids: payload.selectedSubjectIds,
   })
   return data
 }

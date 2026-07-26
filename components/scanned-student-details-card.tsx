@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import { Check, Loader2, X } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -13,15 +14,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { cn } from "@/lib/utils"
 import { studentInitials } from "@/lib/student-qr-payload"
 import type { Student } from "@/types"
 
-function enrolledSubjects(student: Student): string[] {
-  const fromRegistered = (student.registeredSubjects ?? student.registered_subjects ?? [])
-    .map((item) => item.name)
-    .filter(Boolean)
-  if (fromRegistered.length > 0) return fromRegistered
-  return student.enrolledSubjects ?? student.enrolled_subjects ?? []
+export type SelectableEnrolledSubject = {
+  key: string
+  id: number | null
+  name: string
+  alreadyMarked: boolean
 }
 
 function centerName(student: Student) {
@@ -38,11 +40,46 @@ function photoUrl(student: Student) {
   return student.profilePhoto || student.profile_photo || student.photoUrl || student.photo_url || ""
 }
 
+export function getEnrolledSubjectOptions(student: Student): SelectableEnrolledSubject[] {
+  const already = new Set(
+    (student.alreadyMarkedSubjects ?? student.already_marked_subjects ?? []).map((name) =>
+      name.trim().toLowerCase(),
+    ),
+  )
+  const registered = student.registeredSubjects ?? student.registered_subjects ?? []
+  if (registered.length > 0) {
+    return registered
+      .map((item) => {
+        const name = item.name.trim()
+        return {
+          key: item.id != null ? `id:${item.id}` : `name:${name.toLowerCase()}`,
+          id: item.id ?? null,
+          name,
+          alreadyMarked: already.has(name.toLowerCase()),
+        }
+      })
+      .filter((item) => item.name)
+  }
+
+  return (student.enrolledSubjects ?? student.enrolled_subjects ?? []).map((name) => {
+    const trimmed = name.trim()
+    return {
+      key: `name:${trimmed.toLowerCase()}`,
+      id: null,
+      name: trimmed,
+      alreadyMarked: already.has(trimmed.toLowerCase()),
+    }
+  })
+}
+
 interface ScannedStudentDetailsCardProps {
   student: Student
   marking?: boolean
   marked?: boolean
-  onMarkAttendance: () => void
+  onMarkAttendance: (selection: {
+    selectedSubjectIds: number[]
+    selectedSubjects: string[]
+  }) => void
   onDismiss: () => void
 }
 
@@ -53,7 +90,13 @@ export function ScannedStudentDetailsCard({
   onMarkAttendance,
   onDismiss,
 }: ScannedStudentDetailsCardProps) {
-  const subjects = enrolledSubjects(student)
+  const subjects = useMemo(() => getEnrolledSubjectOptions(student), [student])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
+
+  useEffect(() => {
+    setSelectedKeys(subjects.filter((item) => !item.alreadyMarked).map((item) => item.key))
+  }, [subjects])
+
   const name = student.full_name?.trim() || "Student"
   const grade =
     student.grade ||
@@ -62,6 +105,24 @@ export function ScannedStudentDetailsCard({
     student.classroom_name ||
     "—"
   const photo = photoUrl(student)
+  const selectableCount = subjects.filter((item) => !item.alreadyMarked).length
+
+  function toggleSubject(key: string, disabled: boolean) {
+    if (disabled || marking || marked) return
+    setSelectedKeys((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    )
+  }
+
+  function handleMark() {
+    const selected = subjects.filter((item) => selectedKeys.includes(item.key) && !item.alreadyMarked)
+    onMarkAttendance({
+      selectedSubjectIds: selected
+        .map((item) => item.id)
+        .filter((id): id is number => typeof id === "number"),
+      selectedSubjects: selected.map((item) => item.name),
+    })
+  }
 
   return (
     <Card className="border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)] ring-[#A2D4ED]/40">
@@ -125,24 +186,59 @@ export function ScannedStudentDetailsCard({
         </dl>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium tracking-wide text-[#0047AB]/70 uppercase">
-            Registered Subjects
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium tracking-wide text-[#0047AB]/70 uppercase">
+              Today&apos;s Class
+            </p>
+            <p className="text-xs text-[#0047AB]/70">Select subject(s) attending now</p>
+          </div>
+
           {subjects.length === 0 ? (
-            <p className="text-sm text-[#0047AB]/70">No enrolled subjects on file.</p>
+            <p className="rounded-lg border border-dashed border-[#A2D4ED]/60 bg-[#f8fbfe] px-3 py-4 text-sm text-[#0047AB]/75">
+              No enrolled subjects on file for this student.
+            </p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {subjects.map((subject) => (
-                <Badge
-                  key={subject}
-                  variant="outline"
-                  className="gap-1 border-[#A2D4ED] bg-[#f8fbfe] px-2.5 py-1 text-sm font-medium text-[#05082E]"
-                >
-                  <Check className="size-3.5 text-emerald-600" />
-                  {subject}
-                </Badge>
-              ))}
-            </div>
+            <ul className="space-y-2">
+              {subjects.map((subject) => {
+                const checked = selectedKeys.includes(subject.key)
+                const disabled = subject.alreadyMarked || marking || marked
+                return (
+                  <li key={subject.key}>
+                    <label
+                      className={cn(
+                        "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 transition-colors",
+                        subject.alreadyMarked
+                          ? "border-amber-200 bg-amber-50/70"
+                          : checked
+                            ? "border-[#05082E]/30 bg-[#f8fbfe]"
+                            : "border-[#A2D4ED]/60 bg-white hover:bg-[#f8fbfe]",
+                        disabled && !subject.alreadyMarked ? "opacity-70" : null,
+                      )}
+                    >
+                      <Checkbox
+                        checked={checked || subject.alreadyMarked}
+                        disabled={disabled}
+                        onCheckedChange={() => toggleSubject(subject.key, disabled)}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#05082E]">{subject.name}</p>
+                        {subject.alreadyMarked ? (
+                          <p className="text-xs text-amber-700">Already marked today</p>
+                        ) : null}
+                      </div>
+                      {subject.alreadyMarked ? (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-300 bg-amber-100 text-amber-800"
+                        >
+                          Done
+                        </Badge>
+                      ) : null}
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
           )}
         </div>
       </CardContent>
@@ -158,8 +254,15 @@ export function ScannedStudentDetailsCard({
             <Button
               type="button"
               className="w-full flex-1 bg-[#05082E] text-white hover:bg-[#05082E]/90"
-              onClick={onMarkAttendance}
-              disabled={marking}
+              onClick={handleMark}
+              disabled={
+                marking ||
+                subjects.length === 0 ||
+                selectableCount === 0 ||
+                selectedKeys.filter((key) =>
+                  subjects.some((item) => item.key === key && !item.alreadyMarked),
+                ).length === 0
+              }
             >
               {marking ? (
                 <>

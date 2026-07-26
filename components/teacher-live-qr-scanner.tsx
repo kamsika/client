@@ -5,20 +5,18 @@ import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { Camera, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
-import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
 import { ScannedStudentDetailsCard } from "@/components/scanned-student-details-card"
 import { Button } from "@/components/ui/button"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
 import { getScannedStudentId } from "@/lib/parse-student-qr"
 import { cn } from "@/lib/utils"
-import { scanCenterAttendance, type AttendanceSubjectOption } from "@/services/attendance"
+import { scanCenterAttendance } from "@/services/attendance"
 import { lookupStudentByScannedId } from "@/services/student"
 import type { Attendance, Student } from "@/types"
 
 type FacingMode = "environment" | "user"
 
 interface TeacherLiveQrScannerProps {
-  classroomId?: number
   onMarked?: (attendance: Attendance) => void
   /** When true, start the camera as soon as the component mounts. */
   autoStart?: boolean
@@ -187,7 +185,6 @@ async function startQrScanner(
 }
 
 export function TeacherLiveQrScanner({
-  classroomId,
   onMarked,
   autoStart = true,
 }: TeacherLiveQrScannerProps) {
@@ -210,12 +207,6 @@ export function TeacherLiveQrScanner({
     marked: boolean
   } | null>(null)
   const [markingAttendance, setMarkingAttendance] = useState(false)
-  const [pendingSelection, setPendingSelection] = useState<{
-    scannedId: string
-    studentName: string
-    options: AttendanceSubjectOption[]
-    paymentStatus?: "Pending" | "Paid" | "Overdue"
-  } | null>(null)
 
   const stopScanner = useCallback(async () => {
     const scanner = scannerRef.current
@@ -226,12 +217,7 @@ export function TeacherLiveQrScanner({
 
   const processScan = useCallback(
     async (rawValue: string) => {
-      if (pendingSelection || preview || markingAttendance) return
-      if (!classroomId) {
-        toast.error("Select a classroom before scanning")
-        setScanStatus("Select a classroom first")
-        return
-      }
+      if (preview || markingAttendance) return
 
       const scannedId = getScannedStudentId(rawValue)
       if (!scannedId) {
@@ -270,11 +256,21 @@ export function TeacherLiveQrScanner({
         inFlightRef.current.delete(scannedId)
       }
     },
-    [classroomId, markingAttendance, pendingSelection, preview],
+    [markingAttendance, preview],
   )
 
-  async function handleMarkAttendance() {
-    if (!preview || !classroomId || markingAttendance || preview.marked) return
+  async function handleMarkAttendance(selection: {
+    selectedSubjectIds: number[]
+    selectedSubjects: string[]
+  }) {
+    if (!preview || markingAttendance || preview.marked) return
+    if (
+      selection.selectedSubjectIds.length === 0 &&
+      selection.selectedSubjects.length === 0
+    ) {
+      toast.error("Select at least one subject")
+      return
+    }
 
     const { scannedId, student } = preview
     const name = student.full_name || "Student"
@@ -284,19 +280,19 @@ export function TeacherLiveQrScanner({
     setScanStatus(`Marking Present: ${name}…`)
 
     try {
-      console.log("[QR] Sending student ID to API:", scannedId, "classroom:", classroomId)
+      console.log(
+        "[QR] Sending student ID to API:",
+        scannedId,
+        "subjects:",
+        selection.selectedSubjects,
+      )
       const result = await scanCenterAttendance({
         scannedStudentId: scannedId,
-        classroomId,
+        selectedSubjects: selection.selectedSubjects,
+        selectedSubjectIds: selection.selectedSubjectIds,
       })
 
       const attendance = result.attendance ?? result.data
-      const subjects =
-        result.markedAttendanceSubjects ??
-        result.marked_attendance_subjects ??
-        result.autoMarkedSubjects ??
-        result.newlyMarkedSubjects ??
-        []
       const newlyMarked = result.newlyMarkedSubjects ?? []
       const alreadyMarked = result.alreadyMarkedSubjects ?? []
       const presentDetails = (result.presentNowDetails ?? []).map(
@@ -306,19 +302,6 @@ export function TeacherLiveQrScanner({
         (item) =>
           item.label || `Already marked for ${item.subjectName ?? item.subject_name}.`,
       )
-      const attendanceOptions =
-        result.attendanceOptions ?? result.attendance_options ?? []
-      const paymentStatus =
-        result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status
-
-      if (attendanceOptions.length > 1) {
-        setPendingSelection({
-          scannedId,
-          studentName: name,
-          options: attendanceOptions,
-          paymentStatus,
-        })
-      }
 
       const isAlready =
         result.status === "AlreadyMarked" ||
@@ -326,13 +309,10 @@ export function TeacherLiveQrScanner({
       const isSuccess =
         result.status === "Present" ||
         newlyMarked.length > 0 ||
-        subjects.length > 0 ||
         Boolean(attendance)
 
       recentScansRef.current.set(scannedId, Date.now())
-      setPreview((current) =>
-        current ? { ...current, marked: true } : current,
-      )
+      setPreview((current) => (current ? { ...current, marked: true } : current))
 
       setRecentScans((current) =>
         [
@@ -360,6 +340,10 @@ export function TeacherLiveQrScanner({
             </p>
           </div>,
         )
+        window.setTimeout(() => {
+          setPreview(null)
+          setScanStatus("Camera ready — point at a student QR code")
+        }, 1800)
         return
       }
 
@@ -414,27 +398,6 @@ export function TeacherLiveQrScanner({
       toast.error(message)
     } finally {
       setMarkingAttendance(false)
-    }
-  }
-
-  async function confirmUpcomingClasses(selectedSubjects: string[]) {
-    if (!pendingSelection || !classroomId) return
-    try {
-      const result = await scanCenterAttendance({
-        scannedStudentId: pendingSelection.scannedId,
-        classroomId,
-        selectedSubjects,
-      })
-      const newlyMarked = result.newlyMarkedSubjects ?? []
-      if (newlyMarked.length > 0) {
-        toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
-      }
-      const attendance = result.attendance ?? result.data
-      if (attendance) onMarked?.(attendance)
-      setPreview((current) => (current ? { ...current, marked: true } : current))
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to confirm class attendance"))
-      throw error
     }
   }
 
@@ -500,7 +463,7 @@ export function TeacherLiveQrScanner({
   }
 
   useEffect(() => {
-    if (!autoStart || !classroomId) return
+    if (!autoStart) return
     let cancelled = false
 
     const timer = window.setTimeout(() => {
@@ -534,7 +497,7 @@ export function TeacherLiveQrScanner({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [autoStart, classroomId, startScanner])
+  }, [autoStart, startScanner])
 
   async function handleSwitchCamera() {
     if (cameraStarting) return
@@ -571,17 +534,6 @@ export function TeacherLiveQrScanner({
 
   return (
     <div className="space-y-4">
-      <AttendanceSubjectSelectionDialog
-        open={Boolean(pendingSelection)}
-        studentName={pendingSelection?.studentName ?? "Student"}
-        options={pendingSelection?.options ?? []}
-        paymentStatus={pendingSelection?.paymentStatus}
-        onOpenChange={(open) => {
-          if (!open) setPendingSelection(null)
-        }}
-        onConfirm={confirmUpcomingClasses}
-      />
-
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#A2D4ED]/50 bg-[#f8fbfe] px-3 py-2 text-sm">
         <span className="text-[#0047AB]/80">Scan status</span>
         <span className="font-medium text-[#05082E]">{scanStatus}</span>
@@ -616,7 +568,7 @@ export function TeacherLiveQrScanner({
             <Button
               type="button"
               onClick={() => void handleEnableCamera("environment")}
-              disabled={cameraStarting || !classroomId}
+              disabled={cameraStarting}
             >
               <Camera className="size-4" />
               {cameraStarting ? "Starting camera..." : "Start Scanner"}
@@ -668,7 +620,7 @@ export function TeacherLiveQrScanner({
           student={preview.student}
           marking={markingAttendance}
           marked={preview.marked}
-          onMarkAttendance={() => void handleMarkAttendance()}
+          onMarkAttendance={(selection) => void handleMarkAttendance(selection)}
           onDismiss={dismissPreview}
         />
       ) : null}

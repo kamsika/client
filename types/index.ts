@@ -95,6 +95,24 @@ export interface Student {
     teacher_name?: string | null
     teacherName?: string | null
   }>
+  already_marked_subjects?: string[]
+  alreadyMarkedSubjects?: string[]
+  already_marked_subject_details?: Array<{
+    id?: number | null
+    subject_id?: number | null
+    subjectId?: number | null
+    name?: string
+    subject_name?: string
+    subjectName?: string
+  }>
+  alreadyMarkedSubjectDetails?: Array<{
+    id?: number | null
+    subject_id?: number | null
+    subjectId?: number | null
+    name?: string
+    subject_name?: string
+    subjectName?: string
+  }>
   classroom_id?: number | null
   classroomId?: number | null
   classroom_name?: string | null
@@ -113,11 +131,15 @@ export interface Attendance {
   date: string
   arrival_time: string | null
   status: "Present" | "Absent" | "Late"
+  subject_id?: number | null
+  subjectId?: number | null
   subject_name?: string | null
   subjectName?: string | null
   marked_via?: string | null
   markedVia?: string | null
   marked_by: number | null
+  checker_id?: number | null
+  checkerId?: number | null
   student_name: string | null
   registration_no: string | null
 }
