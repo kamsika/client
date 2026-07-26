@@ -1,13 +1,12 @@
 "use client"
 
-import { DashboardShell } from "@/components/dashboard-shell"
 import { TeacherAttendanceDashboard } from "@/components/teacher-attendance-dashboard"
-import { getTeacherNav } from "@/lib/teacher-nav"
+import { TeacherShell } from "@/components/teacher-shell"
 
 export default function TeacherAttendancePage() {
   return (
-    <DashboardShell title="Attendance" navItems={getTeacherNav()} allowedRoles={["teacher"]}>
+    <TeacherShell title="Full Roster">
       <TeacherAttendanceDashboard />
-    </DashboardShell>
+    </TeacherShell>
   )
 }
