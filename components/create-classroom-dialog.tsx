@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { startTransition, useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { SubjectSelect } from "@/components/subject-select"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,11 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { DEFAULT_ENROLLABLE_SUBJECTS } from "@/lib/enrollable-subjects"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { cn } from "@/lib/utils"
 import { createClassroom } from "@/services/classroom"
-import type { Classroom, User } from "@/types"
+import { listSubjects } from "@/services/subject"
+import type { Classroom, Subject, User } from "@/types"
 
 const fieldClass =
   "h-10 border-[#A2D4ED] bg-white transition focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40"
@@ -104,6 +105,7 @@ interface CreateClassroomDialogProps {
 
 export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDialogProps) {
   const [open, setOpen] = useState(false)
+  const [formReady, setFormReady] = useState(false)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState("")
   const [grade, setGrade] = useState("")
@@ -111,11 +113,8 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
   const [assignments, setAssignments] = useState<SubjectAssignment[]>([emptyAssignment()])
   const [slots, setSlots] = useState<TimetableRow[]>([emptySlot()])
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  const subjectOptions = useMemo(() => {
-    const fromAssignments = assignments.map((item) => item.subject.trim()).filter(Boolean)
-    return Array.from(new Set([...DEFAULT_ENROLLABLE_SUBJECTS, ...fromAssignments]))
-  }, [assignments])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [loadingSubjects, setLoadingSubjects] = useState(false)
 
   const assignedSubjects = useMemo(
     () => assignments.map((item) => item.subject.trim()).filter(Boolean),
@@ -137,6 +136,64 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
     return grouped
   }, [slots])
 
+  // Prefetch subjects so opening the dialog does not wait on the network.
+  useEffect(() => {
+    let cancelled = false
+    setLoadingSubjects(true)
+    void listSubjects()
+      .then((items) => {
+        if (!cancelled) setSubjects(items)
+      })
+      .catch(() => {
+        /* refreshed again when dialog opens */
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSubjects(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Mount the heavy form after the dialog shell opens so the click handler stays light.
+  useEffect(() => {
+    if (!open) {
+      setFormReady(false)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      startTransition(() => setFormReady(true))
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+
+    async function loadSubjects() {
+      try {
+        const items = await listSubjects()
+        if (!cancelled) setSubjects(items)
+      } catch {
+        if (!cancelled) toast.error("Failed to load subjects")
+      } finally {
+        if (!cancelled) setLoadingSubjects(false)
+      }
+    }
+
+    void loadSubjects()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  function handleSubjectCreated(subject: Subject) {
+    setSubjects((current) => {
+      if (current.some((item) => item.id === subject.id)) return current
+      return [...current, subject].sort((a, b) => a.name.localeCompare(b.name))
+    })
+  }
   function resetForm() {
     setName("")
     setGrade("")
@@ -316,7 +373,10 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
       open={open}
       onOpenChange={(next) => {
         setOpen(next)
-        if (!next) resetForm()
+        if (!next) {
+          setFormReady(false)
+          resetForm()
+        }
       }}
     >
       <DialogTrigger render={<Button className={cn("h-10", primaryBtn)} />}>
@@ -331,6 +391,12 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
           </DialogDescription>
         </DialogHeader>
 
+        {!formReady ? (
+          <div className="flex h-40 items-center justify-center gap-2 text-sm text-[#0047AB]/70">
+            <Loader2 className="size-4 animate-spin" />
+            Loading form…
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Classroom Details */}
           <section className="rounded-2xl border border-[#A2D4ED]/50 bg-[#f8fbfe] p-4 shadow-[0_6px_18px_rgba(5,8,46,0.04)]">
@@ -349,7 +415,7 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
               </div>
               <div className="space-y-2">
                 <Label className="text-[#05082E]">Grade</Label>
-                <Select value={grade || undefined} onValueChange={(value) => value && setGrade(value)}>
+                <Select value={grade || null} onValueChange={(value) => value && setGrade(value)}>
                   <SelectTrigger className={cn(fieldClass, "w-full", errors.grade && "border-destructive")}>
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
@@ -403,6 +469,9 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
             ) : null}
 
             <div className="mt-3 space-y-2">
+              {loadingSubjects && subjects.length === 0 ? (
+                <p className="text-xs text-[#0047AB]/70">Loading subjects…</p>
+              ) : null}
               {assignments.map((row, index) => (
                 <div
                   key={row.id}
@@ -410,36 +479,28 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
                 >
                   <div className="space-y-1.5">
                     <Label className="text-xs text-[#0047AB]">Subject {index + 1}</Label>
-                    <Select
-                      value={row.subject || undefined}
-                      onValueChange={(value) => value && updateAssignment(row.id, { subject: value })}
-                    >
-                      <SelectTrigger className={cn(fieldClass, "w-full")}>
-                        <SelectValue placeholder="Select subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjectOptions.map((subject) => (
-                          <SelectItem key={subject} value={subject}>
-                            {subject}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      className={fieldClass}
-                      placeholder="Or type a custom subject"
-                      value={
-                        (DEFAULT_ENROLLABLE_SUBJECTS as readonly string[]).includes(row.subject)
-                          ? ""
-                          : row.subject
-                      }
-                      onChange={(e) => updateAssignment(row.id, { subject: e.target.value })}
+                    <SubjectSelect
+                      value={row.subject || null}
+                      subjects={subjects}
+                      teachers={teachers}
+                      onSubjectCreated={handleSubjectCreated}
+                      onValueChange={(subjectName, subject) => {
+                        updateAssignment(row.id, {
+                          subject: subjectName,
+                          teacherId:
+                            subject?.teacher_id || subject?.teacherId
+                              ? String(subject.teacher_id ?? subject.teacherId)
+                              : row.teacherId,
+                        })
+                      }}
+                      placeholder="Select subject"
+                      triggerClassName="h-10"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-[#0047AB]">Teacher</Label>
                     <Select
-                      value={row.teacherId || undefined}
+                      value={row.teacherId || null}
                       onValueChange={(value) => value && updateAssignment(row.id, { teacherId: value })}
                     >
                       <SelectTrigger className={cn(fieldClass, "w-full")}>
@@ -559,33 +620,39 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
                                 <Label className="text-[10px] text-[#0047AB] md:hidden">
                                   Subject
                                 </Label>
-                                <Select
-                                  value={slot.subject || undefined}
-                                  onValueChange={(value) =>
-                                    value && updateSlot(slot.id, { subject: value })
+                                <SubjectSelect
+                                  value={slot.subject || null}
+                                  subjects={
+                                    assignedSubjects.length
+                                      ? subjects.filter((item) =>
+                                          assignedSubjects.includes(item.name),
+                                        )
+                                      : subjects
                                   }
-                                >
-                                  <SelectTrigger className={cn(fieldClass, "h-9 w-full")}>
-                                    <SelectValue placeholder="Subject" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {(assignedSubjects.length
-                                      ? assignedSubjects
-                                      : [...DEFAULT_ENROLLABLE_SUBJECTS]
-                                    ).map((subject) => (
-                                      <SelectItem key={subject} value={subject}>
-                                        {subject}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                  teachers={teachers}
+                                  onSubjectCreated={(subject) => {
+                                    handleSubjectCreated(subject)
+                                  }}
+                                  onValueChange={(subjectName, subject) => {
+                                    updateSlot(slot.id, {
+                                      subject: subjectName,
+                                      teacherId:
+                                        subject?.teacher_id || subject?.teacherId
+                                          ? String(subject.teacher_id ?? subject.teacherId)
+                                          : slot.teacherId,
+                                    })
+                                  }}
+                                  placeholder="Subject"
+                                  triggerClassName="h-9"
+                                  allowAdd={assignedSubjects.length === 0}
+                                />
                               </div>
                               <div className="space-y-1 sm:col-span-2 md:col-span-1 md:space-y-0">
                                 <Label className="text-[10px] text-[#0047AB] md:hidden">
                                   Teacher
                                 </Label>
                                 <Select
-                                  value={slot.teacherId || undefined}
+                                  value={slot.teacherId || null}
                                   onValueChange={(value) =>
                                     value && updateSlot(slot.id, { teacherId: value })
                                   }
@@ -642,6 +709,7 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
             )}
           </Button>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   )

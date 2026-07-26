@@ -37,6 +37,20 @@ export interface ClassroomSubjectTeacher {
   teacherName?: string | null
 }
 
+export interface Subject {
+  id: number
+  institution_id: number
+  institutionId?: number
+  name: string
+  code?: string | null
+  teacher_id?: number | null
+  teacherId?: number | null
+  teacher_name?: string | null
+  teacherName?: string | null
+  created_at?: string | null
+  createdAt?: string | null
+}
+
 export interface Student {
   id: number
   institution_id: number

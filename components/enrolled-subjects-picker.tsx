@@ -1,13 +1,13 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { DEFAULT_ENROLLABLE_SUBJECTS } from "@/lib/enrollable-subjects"
 import { cn } from "@/lib/utils"
+import { listSubjects } from "@/services/subject"
 
 interface EnrolledSubjectsPickerProps {
   value: string[]
@@ -27,12 +27,38 @@ export function EnrolledSubjectsPicker({
   className,
 }: EnrolledSubjectsPickerProps) {
   const [customSubject, setCustomSubject] = useState("")
+  const [dbSubjects, setDbSubjects] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (options?.length) return
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      try {
+        const items = await listSubjects()
+        if (!cancelled) {
+          setDbSubjects(items.map((item) => item.name))
+        }
+      } catch {
+        if (!cancelled) setDbSubjects([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [options])
 
   const choices = useMemo(() => {
-    const base = options?.length ? options : [...DEFAULT_ENROLLABLE_SUBJECTS]
+    const base = options?.length ? options : dbSubjects
     const merged = new Set([...base, ...value])
     return Array.from(merged)
-  }, [options, value])
+  }, [options, dbSubjects, value])
 
   function toggle(subject: string) {
     const exists = value.some((item) => item.toLowerCase() === subject.toLowerCase())
@@ -60,7 +86,15 @@ export function EnrolledSubjectsPicker({
           Select the subjects this student is registered for.
         </p>
       </div>
+      {loading && !options?.length ? (
+        <p className="text-muted-foreground text-xs">Loading subjects…</p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
+        {choices.length === 0 && !loading ? (
+          <p className="text-muted-foreground text-sm">
+            No subjects yet. Add one below or create subjects when making a classroom.
+          </p>
+        ) : null}
         {choices.map((subject) => {
           const selected = value.some((item) => item.toLowerCase() === subject.toLowerCase())
           return (
