@@ -333,8 +333,14 @@ export function KioskAttendanceScreen({
       markedStudentIdsRef.current.add(studentId)
 
       const attendance = result.attendance ?? result.data
-      const status = attendance?.status || result.status || "Present"
-      const alreadyToday = /already marked/i.test(result.message || "")
+      const subjects = result.autoMarkedSubjects ?? result.newlyMarkedSubjects ?? []
+      const status =
+        subjects.length > 0
+          ? `Present · ${subjects.join(", ")}`
+          : attendance?.status || result.status || "Present"
+      const alreadyToday =
+        /already marked/i.test(result.message || "") &&
+        !(result.newlyMarkedSubjects && result.newlyMarkedSubjects.length > 0)
 
       if (!alreadyToday) {
         playSuccessChime()
@@ -345,6 +351,9 @@ export function KioskAttendanceScreen({
           status,
           distance,
         })
+        if (subjects.length > 0) {
+          toast.success(`Auto-marked: ${subjects.join(", ")}`)
+        }
         setLog((prev) => {
           if (prev.some((entry) => entry.studentId === studentId)) {
             return prev
@@ -368,7 +377,10 @@ export function KioskAttendanceScreen({
           studentId,
           name,
           registrationNo,
-          status: "Already Marked Today",
+          status:
+            subjects.length > 0
+              ? `Already Marked · ${subjects.join(", ")}`
+              : "Already Marked Today",
           distance,
         })
       }
