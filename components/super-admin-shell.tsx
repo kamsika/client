@@ -23,9 +23,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
@@ -237,13 +235,28 @@ export function SuperAdminShell({
           </Button>
         )}
         {!opts.compact && (
-          <div className="rounded-xl bg-[#ABD2F2]/35 px-3 py-3 ring-1 ring-[#A2D4ED]/50">
+          <div className="mb-2 rounded-xl bg-[#ABD2F2]/35 px-3 py-3 ring-1 ring-[#A2D4ED]/50">
             <p className="truncate text-sm font-semibold text-[#05082E]">{user.full_name}</p>
             <p className="truncate text-[11px] text-[#0047AB]/70">
               {user.role.replaceAll("_", " ")}
             </p>
           </div>
         )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn(
+            "border-[#E88D1D]/40 bg-white text-[#E88D1D] transition hover:bg-[#F9BF15]/20 hover:text-[#b45309]",
+            opts.compact ? "w-full px-0" : "w-full justify-start gap-2",
+          )}
+          onClick={logout}
+          aria-label="Log out"
+          title="Log out"
+        >
+          <LogOut className="size-3.5" />
+          {!opts.compact && "Log out"}
+        </Button>
       </div>
     </aside>
   )
@@ -398,15 +411,6 @@ export function SuperAdminShell({
                     <p className="text-sm font-semibold text-[#05082E]">{user.full_name}</p>
                     <p className="truncate text-xs text-[#0047AB]/70">{user.email}</p>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-[#A2D4ED]/40" />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    className="gap-2 rounded-lg"
-                    onClick={logout}
-                  >
-                    <LogOut className="size-4" />
-                    Log out
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
