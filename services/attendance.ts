@@ -23,9 +23,25 @@ export type AttendanceScanResponse = {
     endTime?: string
     end_time?: string
   }>
+  /** Subjects actually marked Present on this scan (active timetable only). */
+  markedAttendanceSubjects?: string[]
+  marked_attendance_subjects?: string[]
   autoMarkedSubjects?: string[]
   newlyMarkedSubjects?: string[]
   alreadyMarkedSubjects?: string[]
+  presentNowDetails?: Array<{
+    subjectName?: string
+    subject_name?: string
+    timeRange?: string | null
+    label?: string
+    alreadyMarked?: boolean
+  }>
+  alreadyMarkedDetails?: Array<{
+    subjectName?: string
+    subject_name?: string
+    label?: string
+    alreadyMarked?: boolean
+  }>
   autoMarkedDetails?: Array<{
     subjectName?: string
     subject_name?: string
