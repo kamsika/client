@@ -1,13 +1,15 @@
 "use client"
 
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { Camera, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { getScannedStudentId } from "@/lib/parse-student-qr"
+import { cn } from "@/lib/utils"
 import { scanCenterAttendance, type AttendanceSubjectOption } from "@/services/attendance"
 import type { Attendance } from "@/types"
 
@@ -16,25 +18,41 @@ type FacingMode = "environment" | "user"
 interface TeacherLiveQrScannerProps {
   classroomId?: number
   onMarked?: (attendance: Attendance) => void
+  /** When true, start the camera as soon as the component mounts. */
+  autoStart?: boolean
+}
+
+type RecentScan = {
+  id: string
+  studentName: string
+  studentId: string
+  status: string
+  at: number
 }
 
 const SCAN_BOX_SIZE = 250
-const QR_RESCAN_COOLDOWN_MS = 120_000
+const QR_RESCAN_COOLDOWN_MS = 15_000
 
 function getCameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === "NotAllowedError") {
-      return "Camera permission was denied. Allow camera access and try again."
+      return "Camera permission denied. Allow camera access in your browser settings and try again."
     }
     if (error.name === "NotFoundError") {
-      return "No camera was found on this device."
+      return "Camera unavailable. No camera was found on this device."
     }
     if (error.name === "NotReadableError") {
-      return "The camera is in use by another app."
+      return "Camera unavailable. It may be in use by another app."
     }
   }
 
   const message = error instanceof Error ? error.message : String(error ?? "")
+  if (/NotAllowedError|Permission denied|permission/i.test(message)) {
+    return "Camera permission denied. Allow camera access and try again."
+  }
+  if (/NotFoundError|Requested device not found/i.test(message)) {
+    return "Camera unavailable. No camera was found on this device."
+  }
   if (/secure context|https|localhost/i.test(message)) {
     return "Camera requires HTTPS or localhost."
   }
@@ -44,7 +62,6 @@ function getCameraErrorMessage(error: unknown): string {
 function buildScanConfig() {
   return {
     fps: 10,
-    // Keep the scan region within the actual video frame (prevents silent scan failures).
     qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
       const size = Math.max(180, Math.min(SCAN_BOX_SIZE, Math.floor(minEdge * 0.75)))
@@ -55,7 +72,6 @@ function buildScanConfig() {
   }
 }
 
-/** Stop every MediaStream track under a reader root and detach the video. */
 function releaseCameraMedia(root: ParentNode | null | undefined) {
   if (!root) return
 
@@ -90,7 +106,6 @@ async function destroyQrScanner(scanner: Html5Qrcode | null, readerElementId: st
   const container =
     typeof document !== "undefined" ? document.getElementById(readerElementId) : null
 
-  // Release tracks first so the LED turns off even if library stop() is slow/hangs.
   releaseCameraMedia(container)
 
   if (scanner) {
@@ -99,16 +114,15 @@ async function destroyQrScanner(scanner: Html5Qrcode | null, readerElementId: st
         await scanner.stop()
       }
     } catch {
-      // already stopped / element gone
+      // already stopped
     }
     try {
       scanner.clear()
     } catch {
-      // clear() throws if the element was already removed
+      // clear() throws if element was removed
     }
   }
 
-  // Second pass after html5-qrcode cleanup (covers leftover tracks).
   releaseCameraMedia(
     typeof document !== "undefined" ? document.getElementById(readerElementId) : container,
   )
@@ -122,16 +136,28 @@ async function startQrScanner(
   const scanConfig = buildScanConfig()
   const attempts: Array<string | MediaTrackConstraints> =
     facingMode === "environment"
-      ? [{ facingMode: { exact: "environment" } }, { facingMode: "environment" }]
-      : [{ facingMode: "user" }]
+      ? [{ facingMode: { ideal: "environment" } }, { facingMode: "environment" }]
+      : [{ facingMode: { ideal: "user" } }, { facingMode: "user" }]
 
   const cameras = await Html5Qrcode.getCameras().catch(() => [] as { id: string; label: string }[])
-  for (const camera of cameras) {
+  const preferred = cameras.filter((camera) => {
+    const label = camera.label.toLowerCase()
+    if (facingMode === "environment") {
+      return /back|rear|environment|world/i.test(label)
+    }
+    return /front|user|face/i.test(label)
+  })
+  for (const camera of preferred.length ? preferred : cameras) {
     attempts.push(camera.id)
   }
 
   let lastError: unknown = null
   for (const cameraIdOrConfig of attempts) {
+    const el = document.getElementById(elementId)
+    if (!el) {
+      throw new Error("Scanner preview element is not ready")
+    }
+
     const scanner = new Html5Qrcode(elementId, {
       verbose: false,
       formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
@@ -142,14 +168,10 @@ async function startQrScanner(
         cameraIdOrConfig,
         scanConfig,
         (decodedText) => {
-          console.log("🎯 Raw Scanned Text:", decodedText)
           onScanSuccess(decodedText)
         },
-        (errorMessage) => {
-          // Continuous "not found" frames are expected; log sparsely for debugging.
-          if (Math.random() < 0.01) {
-            console.debug("[QR] scan frame:", errorMessage)
-          }
+        () => {
+          // Continuous "QR not found" frames are expected while aiming.
         },
       )
       return scanner
@@ -162,17 +184,24 @@ async function startQrScanner(
   throw lastError ?? new Error("Unable to start camera")
 }
 
-export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrScannerProps) {
-  const readerId = "teacher-live-qr-reader"
+export function TeacherLiveQrScanner({
+  classroomId,
+  onMarked,
+  autoStart = true,
+}: TeacherLiveQrScannerProps) {
+  const reactId = useId().replace(/:/g, "")
+  const readerId = `teacher-live-qr-reader-${reactId}`
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const recentScansRef = useRef<Map<string, number>>(new Map())
+  const inFlightRef = useRef<Set<string>>(new Set())
   const processScanRef = useRef<(value: string) => void>(() => {})
 
   const [cameraActive, setCameraActive] = useState(false)
   const [cameraStarting, setCameraStarting] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [scanStatus, setScanStatus] = useState("Ready to scan")
   const [facingMode, setFacingMode] = useState<FacingMode>("environment")
-  const [lastScan, setLastScan] = useState<string | null>(null)
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([])
   const [pendingSelection, setPendingSelection] = useState<{
     scannedId: string
     studentName: string
@@ -190,13 +219,18 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
   const processScan = useCallback(
     async (rawValue: string) => {
       if (pendingSelection) return
-      console.log("🎯 Raw Scanned Text:", rawValue)
+      if (!classroomId) {
+        toast.error("Select a classroom before scanning")
+        setScanStatus("Select a classroom first")
+        return
+      }
 
-      // Use the exact scanned QR text — do not substitute another student's ID.
-      const scannedId = rawValue.trim()
-      if (!scannedId) return
-
-      console.log("Sending student ID to API:", scannedId)
+      const scannedId = getScannedStudentId(rawValue)
+      if (!scannedId) {
+        toast.error("Invalid QR code")
+        setScanStatus("Invalid QR code")
+        return
+      }
 
       const now = Date.now()
       for (const [id, scannedAt] of recentScansRef.current) {
@@ -204,28 +238,28 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           recentScansRef.current.delete(id)
         }
       }
-      const lastMarkedAt = recentScansRef.current.get(scannedId)
-      if (lastMarkedAt && now - lastMarkedAt < QR_RESCAN_COOLDOWN_MS) return
 
-      // Lock only this QR value. Other student QR values can be processed
-      // immediately, even while this request is still in flight.
-      recentScansRef.current.set(scannedId, now)
+      if (inFlightRef.current.has(scannedId)) return
+      const lastMarkedAt = recentScansRef.current.get(scannedId)
+      if (lastMarkedAt && now - lastMarkedAt < QR_RESCAN_COOLDOWN_MS) {
+        setScanStatus(`Already scanned recently: ${scannedId}`)
+        return
+      }
+
+      inFlightRef.current.add(scannedId)
+      setScanStatus(`Scanning ${scannedId}…`)
+
       try {
+        console.log("[QR] Sending student ID to API:", scannedId, "classroom:", classroomId)
         const result = await scanCenterAttendance({
           scannedStudentId: scannedId,
           classroomId,
         })
+
         const attendance = result.attendance ?? result.data
-        const name =
-          result.studentName ||
-          attendance?.student_name ||
-          "Student"
+        const name = result.studentName || attendance?.student_name || "Student"
         const regNo =
-          result.registrationNo ||
-          attendance?.registration_no ||
-          scannedId
-        const enrolled =
-          result.enrolledSubjects ?? result.enrolled_subjects ?? []
+          result.registrationNo || attendance?.registration_no || scannedId
         const subjects =
           result.markedAttendanceSubjects ??
           result.marked_attendance_subjects ??
@@ -245,6 +279,7 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           result.attendanceOptions ?? result.attendance_options ?? []
         const paymentStatus =
           result.paymentStatus ?? result.payment_status ?? result.monthlyPayment?.payment_status
+
         if (attendanceOptions.length > 1) {
           setPendingSelection({
             scannedId,
@@ -254,88 +289,101 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           })
         }
 
-        setLastScan(
+        const isAlready =
+          result.status === "AlreadyMarked" ||
+          (newlyMarked.length === 0 && alreadyMarked.length > 0)
+        const isSuccess =
+          result.status === "Present" ||
+          newlyMarked.length > 0 ||
+          subjects.length > 0 ||
+          Boolean(attendance)
+
+        // Only cooldown after a successful/recognized scan response.
+        recentScansRef.current.set(scannedId, Date.now())
+
+        setRecentScans((current) =>
           [
-            `${name} (${regNo})`,
-            enrolled.length ? `Enrolled: ${enrolled.join(", ")}` : null,
-            paymentStatus ? `Monthly fee: ${paymentStatus}` : null,
-            newlyMarked.length || presentDetails.length
-              ? `Marked: ${presentDetails.length ? presentDetails.join("; ") : newlyMarked.join(", ")}`
-              : alreadyMarked.length
-                ? alreadyDetails[0] || `Already marked for ${alreadyMarked.join(", ")}`
-                : "No class scheduled now",
-          ]
-            .filter(Boolean)
-            .join(" · "),
+            {
+              id: `${scannedId}-${Date.now()}`,
+              studentName: name,
+              studentId: regNo,
+              status: isAlready ? "Already marked" : "Present",
+              at: Date.now(),
+            },
+            ...current,
+          ].slice(0, 8),
         )
 
-        if (subjects.length === 0 || result.status === "NoClass") {
+        if (isAlready) {
+          setScanStatus(`Already marked: ${name}`)
           toast.message(
             <div className="space-y-1 text-sm">
               <p className="font-semibold">
                 {name} · ID {regNo}
               </p>
-              {enrolled.length > 0 && (
-                <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
-              )}
-              <p>No timetable class at this time — nothing marked.</p>
-            </div>,
-          )
-          return
-        }
-
-        if (result.status === "AlreadyMarked" || (newlyMarked.length === 0 && alreadyMarked.length > 0)) {
-          toast.message(
-            <div className="space-y-1 text-sm">
-              <p className="font-semibold">
-                {name} · ID {regNo}
-              </p>
-              {enrolled.length > 0 && (
-                <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
-              )}
               <p>
-                ⚠️{" "}
                 {alreadyDetails[0] ||
-                  `Already marked for ${alreadyMarked.join(", ") || "current class"}.`}
+                  `Already marked for ${alreadyMarked.join(", ") || "today"}.`}
               </p>
             </div>,
           )
           return
         }
 
-        toast.success(
+        if (isSuccess) {
+          setScanStatus(`Marked Present: ${name}`)
+          toast.success(
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">Attendance marked successfully</p>
+              <p>
+                Name: <span className="font-medium">{name}</span>
+              </p>
+              <p>
+                Student ID: <span className="font-mono text-xs">{regNo}</span>
+              </p>
+              {(presentDetails.length > 0 || newlyMarked.length > 0) && (
+                <p>
+                  {presentDetails.length > 0
+                    ? presentDetails.join("; ")
+                    : newlyMarked.join(", ")}
+                </p>
+              )}
+            </div>,
+          )
+          if (attendance) onMarked?.(attendance)
+          return
+        }
+
+        setScanStatus(`Scan completed for ${name}`)
+        toast.message(
           <div className="space-y-1 text-sm">
             <p className="font-semibold">
               {name} · ID {regNo}
             </p>
-            {enrolled.length > 0 && (
-              <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
-            )}
-            <p>
-              ✅{" "}
-              {presentDetails.length > 0
-                ? presentDetails.join("; ")
-                : newlyMarked.join(", ") || subjects.join(", ")}
-            </p>
-            {alreadyDetails.length > 0 && <p>⚠️ {alreadyDetails.join(" ")}</p>}
+            <p>{result.message || "Scan processed."}</p>
           </div>,
         )
-        if (attendance) {
-          onMarked?.(attendance)
-        }
       } catch (error) {
+        // Allow retry after a failed mark.
+        recentScansRef.current.delete(scannedId)
         if (isAlreadyScannedError(error)) {
-          toast.message(getApiErrorMessage(error, "Already scanned for today!"))
+          recentScansRef.current.set(scannedId, Date.now())
+          setScanStatus(`Already marked: ${scannedId}`)
+          toast.message(getApiErrorMessage(error, "Already scanned"))
           return
         }
-        toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
+        const message = getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`)
+        setScanStatus(message)
+        toast.error(message)
+      } finally {
+        inFlightRef.current.delete(scannedId)
       }
     },
     [classroomId, onMarked, pendingSelection],
   )
 
   async function confirmUpcomingClasses(selectedSubjects: string[]) {
-    if (!pendingSelection) return
+    if (!pendingSelection || !classroomId) return
     try {
       const result = await scanCenterAttendance({
         scannedStudentId: pendingSelection.scannedId,
@@ -354,7 +402,6 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
     }
   }
 
-  // Keep the Html5Qrcode callback stable across re-renders.
   useEffect(() => {
     processScanRef.current = (value: string) => {
       void processScan(value)
@@ -364,8 +411,7 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
   const startScanner = useCallback(
     async (mode: FacingMode) => {
       await stopScanner()
-      // Let the reader element remount/clear before restarting.
-      await new Promise((resolve) => setTimeout(resolve, 150))
+      await new Promise((resolve) => setTimeout(resolve, 120))
 
       const scanner = await startQrScanner(readerId, mode, (decodedText) => {
         processScanRef.current(decodedText)
@@ -373,13 +419,13 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
       scannerRef.current = scanner
       setFacingMode(mode)
       setCameraActive(true)
+      setScanStatus("Camera ready — point at a student QR code")
     },
-    [stopScanner],
+    [readerId, stopScanner],
   )
 
   useEffect(() => {
     return () => {
-      // Sync track stop in cleanup so unmount/navigation always kills the LED.
       const scanner = scannerRef.current
       scannerRef.current = null
       const container = document.getElementById(readerId)
@@ -388,7 +434,7 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
     }
   }, [readerId])
 
-  async function handleEnableCamera() {
+  async function handleEnableCamera(mode: FacingMode = "environment") {
     setCameraError(null)
     if (typeof window !== "undefined" && !window.isSecureContext) {
       const message = getCameraErrorMessage(new Error("secure context"))
@@ -398,29 +444,72 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
     }
 
     setCameraStarting(true)
+    setScanStatus("Starting camera…")
     try {
-      await startScanner("environment")
+      await startScanner(mode)
     } catch (error) {
       setCameraActive(false)
       const message = getCameraErrorMessage(error)
       setCameraError(message)
+      setScanStatus(message)
       toast.error(message)
     } finally {
       setCameraStarting(false)
     }
   }
 
+  useEffect(() => {
+    if (!autoStart || !classroomId) return
+    let cancelled = false
+
+    const timer = window.setTimeout(() => {
+      if (cancelled) return
+      void (async () => {
+        setCameraError(null)
+        if (typeof window !== "undefined" && !window.isSecureContext) {
+          const message = getCameraErrorMessage(new Error("secure context"))
+          setCameraError(message)
+          toast.error(message)
+          return
+        }
+        setCameraStarting(true)
+        setScanStatus("Starting camera…")
+        try {
+          await startScanner("environment")
+        } catch (error) {
+          if (cancelled) return
+          setCameraActive(false)
+          const message = getCameraErrorMessage(error)
+          setCameraError(message)
+          setScanStatus(message)
+          toast.error(message)
+        } finally {
+          if (!cancelled) setCameraStarting(false)
+        }
+      })()
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [autoStart, classroomId, startScanner])
+
   async function handleSwitchCamera() {
     if (cameraStarting) return
     const nextMode: FacingMode = facingMode === "environment" ? "user" : "environment"
     setCameraError(null)
     setCameraStarting(true)
+    setScanStatus(
+      nextMode === "environment" ? "Switching to back camera…" : "Switching to front camera…",
+    )
     try {
       await startScanner(nextMode)
     } catch (error) {
       setCameraActive(false)
       const message = getCameraErrorMessage(error)
       setCameraError(message)
+      setScanStatus(message)
       toast.error(message)
     } finally {
       setCameraStarting(false)
@@ -433,13 +522,14 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
     try {
       await stopScanner()
       setCameraError(null)
+      setScanStatus("Camera stopped")
     } finally {
       setCameraStarting(false)
     }
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <AttendanceSubjectSelectionDialog
         open={Boolean(pendingSelection)}
         studentName={pendingSelection?.studentName ?? "Student"}
@@ -450,13 +540,18 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
         }}
         onConfirm={confirmUpcomingClasses}
       />
-      <div className="relative min-h-[320px] overflow-hidden rounded-lg border bg-black">
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#A2D4ED]/50 bg-[#f8fbfe] px-3 py-2 text-sm">
+        <span className="text-[#0047AB]/80">Scan status</span>
+        <span className="font-medium text-[#05082E]">{scanStatus}</span>
+      </div>
+
+      <div className="relative min-h-[320px] overflow-hidden rounded-xl border border-[#A2D4ED]/50 bg-black">
         <div
           id={readerId}
           className="min-h-[320px] w-full [&_img]:hidden [&_video]:max-h-[360px] [&_video]:w-full [&_video]:object-cover"
         />
 
-        {/* Visible alignment guide for the user */}
         {cameraActive && !cameraStarting && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <div
@@ -474,10 +569,16 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
         {!cameraActive && (
           <div className="absolute inset-0 z-20 flex min-h-[320px] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-white/80">
             <p>Allow camera access to start live QR attendance scanning.</p>
-            <p className="text-white/60 text-xs">Align the student QR code inside the square frame.</p>
-            <Button type="button" onClick={() => void handleEnableCamera()} disabled={cameraStarting}>
+            <p className="text-xs text-white/60">
+              Align the student QR code inside the square frame.
+            </p>
+            <Button
+              type="button"
+              onClick={() => void handleEnableCamera("environment")}
+              disabled={cameraStarting || !classroomId}
+            >
               <Camera className="size-4" />
-              {cameraStarting ? "Starting camera..." : "Start Live Scanner"}
+              {cameraStarting ? "Starting camera..." : "Start Scanner"}
             </Button>
           </div>
         )}
@@ -491,19 +592,20 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
 
       {cameraActive && (
         <>
-          <p className="text-muted-foreground text-center text-xs">
+          <p className="text-center text-xs text-[#0047AB]/70">
             Hold the QR code steady inside the green square until it scans.
+            {facingMode === "environment" ? " Using back camera." : " Using front camera."}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               type="button"
               variant="outline"
-              className="flex-1"
+              className="flex-1 border-[#A2D4ED] text-[#0047AB]"
               onClick={() => void handleSwitchCamera()}
               disabled={cameraStarting}
             >
               <SwitchCamera className="size-4" />
-              Switch Camera
+              {facingMode === "environment" ? "Switch to Front" : "Switch to Back"}
             </Button>
             <Button
               type="button"
@@ -518,13 +620,38 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
         </>
       )}
 
-      {cameraError && <p className="text-destructive text-sm">{cameraError}</p>}
+      {cameraError && <p className="text-sm text-red-600">{cameraError}</p>}
 
-      {lastScan && (
-        <p className="text-muted-foreground text-sm">
-          Last scanned: <span className="text-foreground font-medium">{lastScan}</span>
-        </p>
-      )}
+      <div className="rounded-xl border border-[#A2D4ED]/50 bg-white p-4">
+        <p className="text-sm font-semibold text-[#05082E]">Recent scanned students</p>
+        {recentScans.length === 0 ? (
+          <p className="mt-2 text-sm text-[#0047AB]/70">No scans yet this session.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-[#A2D4ED]/30">
+            {recentScans.map((scan) => (
+              <li
+                key={scan.id}
+                className="flex items-center justify-between gap-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-[#05082E]">{scan.studentName}</p>
+                  <p className="font-mono text-xs text-[#0047AB]/75">{scan.studentId}</p>
+                </div>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold",
+                    scan.status === "Present"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-amber-50 text-amber-800",
+                  )}
+                >
+                  {scan.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
