@@ -10,7 +10,18 @@ export async function listPayments(params?: {
   search?: string
   studentId?: number
 }) {
-  const { data } = await apiClient.get<{ payments: StudentFeePayment[]; count?: number }>(
+  const { data } = await apiClient.get<{
+    payments: StudentFeePayment[]
+    count?: number
+    summary?: {
+      total_collected?: number
+      totalCollected?: number
+      paid_count?: number
+      paidCount?: number
+      pending_count?: number
+      pendingCount?: number
+    }
+  }>(
     "/api/payments",
     {
       params: {
@@ -22,7 +33,10 @@ export async function listPayments(params?: {
       },
     },
   )
-  return data.payments ?? []
+  return {
+    payments: data.payments ?? [],
+    summary: data.summary,
+  }
 }
 
 export async function createPayment(payload: {
@@ -87,4 +101,28 @@ export async function updatePayment(
     },
   )
   return data.payment
+}
+
+/** Mark the current or existing monthly fee as paid (checker flow). */
+export async function markPaymentAsPaid(payment: StudentFeePayment, studentId: number) {
+  const today = new Date().toISOString().slice(0, 10)
+  if (payment.id != null) {
+    return updatePayment(payment.id, {
+      paymentStatus: "Paid",
+      paymentDate: today,
+    })
+  }
+
+  const month = payment.month ?? new Date().getMonth() + 1
+  const year = payment.year ?? new Date().getFullYear()
+  const amount = payment.amount ?? payment.amount_due ?? 0
+
+  return createPayment({
+    studentId,
+    month,
+    year,
+    amount,
+    paymentStatus: "Paid",
+    paymentDate: today,
+  })
 }

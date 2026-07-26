@@ -155,6 +155,10 @@ export interface StudentFeePayment {
   createdAt?: string | null
   updated_at?: string | null
   updatedAt?: string | null
+  collected_by?: number | null
+  collectedBy?: number | null
+  collected_by_name?: string | null
+  collectedByName?: string | null
 }
 
 export interface Attendance {

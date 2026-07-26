@@ -122,6 +122,16 @@ export function ScannedStudentDetailsCard({
   const feePending = feeStatus !== "Paid"
   const feeAmount = feeInfo?.amount ?? feeInfo?.amount_due ?? feeInfo?.amountDue ?? null
   const feeMonthLabel = feeInfo?.monthName || feeInfo?.month_name || null
+  const feePaymentDate = feeInfo?.paymentDate || feeInfo?.payment_date || null
+  const feeCollectedBy = feeInfo?.collectedByName || feeInfo?.collected_by_name || null
+
+  function formatFeeDate(value: string | null) {
+    if (!value) return null
+    const datePart = value.slice(0, 10)
+    const [year, month, day] = datePart.split("-")
+    if (!year || !month || !day) return datePart
+    return `${day}/${month}/${year}`
+  }
 
   function toggleSubject(key: string, disabled: boolean) {
     if (disabled || marking || marked) return
@@ -263,7 +273,9 @@ export function ScannedStudentDetailsCard({
             Fee Status
           </p>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium text-[#05082E]">Current Month Fee:</p>
+            <p className="text-sm font-medium text-[#05082E]">
+              {feeMonthLabel ? `${feeMonthLabel} Fee` : "Current Month Fee"}
+            </p>
             {feeStatus === "Paid" ? (
               <Badge
                 variant="outline"
@@ -280,7 +292,12 @@ export function ScannedStudentDetailsCard({
           {feeAmount != null ? (
             <p className="mt-1 text-xs text-[#0047AB]/75">
               Amount: {Number(feeAmount).toLocaleString()}
-              {feeMonthLabel ? ` · ${feeMonthLabel}` : ""}
+            </p>
+          ) : null}
+          {feeStatus === "Paid" && formatFeeDate(feePaymentDate) ? (
+            <p className="mt-1 text-xs text-[#0047AB]/75">
+              Payment Date: {formatFeeDate(feePaymentDate)}
+              {feeCollectedBy ? ` · Collected by ${feeCollectedBy}` : ""}
             </p>
           ) : null}
           {feePending ? (

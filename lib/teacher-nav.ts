@@ -5,6 +5,7 @@ import {
   QrCode,
   UserRound,
   Users,
+  Wallet,
 } from "lucide-react"
 
 export type TeacherNavItem = {
@@ -43,6 +44,12 @@ export function getTeacherNav(): TeacherNavItem[] {
       label: "Students",
       description: "Subjects & profiles",
       icon: Users,
+    },
+    {
+      href: "/teacher/dashboard/fees",
+      label: "Fee Management",
+      description: "Collect & update fees",
+      icon: Wallet,
     },
     {
       href: "/teacher/dashboard/profile",
