@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   QrCode,
   ScanFace,
+  Users,
 } from "lucide-react"
 
 export type TeacherNavItem = {
@@ -23,6 +24,11 @@ export function getTeacherFeatureNav(): TeacherNavItem[] {
       label: "Overview",
       icon: LayoutDashboard,
       exact: true,
+    },
+    {
+      href: "/teacher/dashboard/students",
+      label: "Students",
+      icon: Users,
     },
     {
       href: "/teacher/dashboard/qr-scanner",
