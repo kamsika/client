@@ -25,9 +25,14 @@ import {
 } from "@/components/ui/select"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { cn } from "@/lib/utils"
-import { createClassroom } from "@/services/classroom"
+import {
+  createClassroom,
+  getClassroom,
+  updateClassroom,
+  type ClassroomDetail,
+} from "@/services/classroom"
 import { listSubjects } from "@/services/subject"
-import type { Classroom, Subject, User } from "@/types"
+import type { Classroom, Subject, TimetableSlot, User } from "@/types"
 
 const fieldClass =
   "h-10 border-[#A2D4ED] bg-white transition focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40"
@@ -98,15 +103,73 @@ function emptySlot(): TimetableRow {
   }
 }
 
-interface CreateClassroomDialogProps {
-  teachers: User[]
-  onCreated: (classroom: Classroom) => void
+function normalizeTime(value?: string | null) {
+  const text = String(value || "").trim()
+  if (text.length >= 5) return text.slice(0, 5)
+  return text
 }
 
-export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDialogProps) {
-  const [open, setOpen] = useState(false)
+function gradeFromClassroom(gradeValue?: string | null) {
+  const grade = (gradeValue || "").trim()
+  if (!grade) return { grade: "", customGrade: "" }
+  if ((GRADE_OPTIONS as readonly string[]).includes(grade)) {
+    return { grade, customGrade: "" }
+  }
+  return { grade: "Other", customGrade: grade }
+}
+
+function assignmentsFromClassroom(classroom: ClassroomDetail): SubjectAssignment[] {
+  const rows = classroom.subject_teachers || []
+  if (!rows.length) return [emptyAssignment()]
+  return rows.map((item) => ({
+    id: newId(),
+    subject: item.subject || item.subjectName || "",
+    teacherId: String(item.teacher_id ?? item.teacherId ?? ""),
+  }))
+}
+
+function slotsFromTimetable(timetable?: TimetableSlot[]): TimetableRow[] {
+  if (!timetable?.length) return [emptySlot()]
+  return timetable.map((slot) => ({
+    id: newId(),
+    dayOfWeek: slot.dayOfWeek || slot.day_of_week || "Monday",
+    startTime: normalizeTime(slot.startTime || slot.start_time) || "09:00",
+    endTime: normalizeTime(slot.endTime || slot.end_time) || "10:00",
+    subject: slot.subjectName || slot.subject_name || "",
+    teacherId: String(slot.teacherId ?? slot.teacher_id ?? ""),
+  }))
+}
+
+interface CreateClassroomDialogProps {
+  teachers: User[]
+  onCreated?: (classroom: Classroom) => void
+  onUpdated?: (classroom: Classroom) => void
+  /** When set, dialog edits this classroom (controlled via open/onOpenChange). */
+  editClassroomId?: number | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}
+
+export function CreateClassroomDialog({
+  teachers,
+  onCreated,
+  onUpdated,
+  editClassroomId = null,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: CreateClassroomDialogProps) {
+  const isEdit = editClassroomId != null
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = isEdit ? Boolean(controlledOpen) : internalOpen
+
+  function setOpen(next: boolean) {
+    if (isEdit) controlledOnOpenChange?.(next)
+    else setInternalOpen(next)
+  }
+
   const [formReady, setFormReady] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [loadingEdit, setLoadingEdit] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [name, setName] = useState("")
   const [grade, setGrade] = useState("")
   const [customGrade, setCustomGrade] = useState("")
@@ -187,6 +250,38 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
       cancelled = true
     }
   }, [open])
+
+  useEffect(() => {
+    if (!open || !isEdit || editClassroomId == null) return
+    let cancelled = false
+
+    async function loadClassroom() {
+      setLoadingEdit(true)
+      try {
+        const classroom = await getClassroom(editClassroomId)
+        if (cancelled) return
+        const gradeState = gradeFromClassroom(classroom.grade)
+        setName(classroom.name || "")
+        setGrade(gradeState.grade)
+        setCustomGrade(gradeState.customGrade)
+        setAssignments(assignmentsFromClassroom(classroom))
+        setSlots(slotsFromTimetable(classroom.timetable))
+        setErrors({})
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(getApiErrorMessage(error, "Failed to load classroom"))
+          setOpen(false)
+        }
+      } finally {
+        if (!cancelled) setLoadingEdit(false)
+      }
+    }
+
+    void loadClassroom()
+    return () => {
+      cancelled = true
+    }
+  }, [open, isEdit, editClassroomId])
 
   function handleSubjectCreated(subject: Subject) {
     setSubjects((current) => {
@@ -325,7 +420,7 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
     return Object.keys(nextErrors).length === 0
   }
 
-  async function handleCreate() {
+  async function handleSave() {
     if (!validate()) {
       toast.error("Please fix the form errors")
       return
@@ -349,22 +444,35 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
         teacherId: Number(slot.teacherId),
       }))
 
-    setCreating(true)
+    const payload = {
+      name: name.trim(),
+      grade: resolvedGrade,
+      subject_teachers: subjectTeachers,
+      timetable,
+    }
+
+    setSaving(true)
     try {
-      const classroom = await createClassroom({
-        name: name.trim(),
-        grade: resolvedGrade,
-        subject_teachers: subjectTeachers,
-        timetable,
-      })
-      toast.success("Classroom created with timetable")
-      onCreated(classroom)
+      if (isEdit && editClassroomId != null) {
+        const classroom = await updateClassroom(editClassroomId, payload)
+        toast.success("Classroom updated successfully")
+        onUpdated?.(classroom)
+      } else {
+        const classroom = await createClassroom(payload)
+        toast.success("Classroom created with timetable")
+        onCreated?.(classroom)
+      }
       setOpen(false)
       resetForm()
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Failed to create classroom"))
+      toast.error(
+        getApiErrorMessage(
+          error,
+          isEdit ? "Failed to update classroom" : "Failed to create classroom",
+        ),
+      )
     } finally {
-      setCreating(false)
+      setSaving(false)
     }
   }
 
@@ -379,22 +487,28 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
         }
       }}
     >
-      <DialogTrigger render={<Button className={cn("h-10", primaryBtn)} />}>
-        <Plus className="size-4" />
-        Create Classroom
-      </DialogTrigger>
+      {!isEdit ? (
+        <DialogTrigger render={<Button className={cn("h-10", primaryBtn)} />}>
+          <Plus className="size-4" />
+          Create Classroom
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="max-h-[90vh] overflow-y-auto border-[#A2D4ED]/40 sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="text-[#05082E]">New Classroom</DialogTitle>
+          <DialogTitle className="text-[#05082E]">
+            {isEdit ? "Edit Classroom" : "New Classroom"}
+          </DialogTitle>
           <DialogDescription>
-            Set up a grade classroom with subject teachers and a weekly timetable.
+            {isEdit
+              ? "Update grade, subject teachers, and the weekly timetable for this classroom."
+              : "Set up a grade classroom with subject teachers and a weekly timetable."}
           </DialogDescription>
         </DialogHeader>
 
-        {!formReady ? (
+        {!formReady || loadingEdit ? (
           <div className="flex h-40 items-center justify-center gap-2 text-sm text-[#0047AB]/70">
             <Loader2 className="size-4 animate-spin" />
-            Loading form…
+            {loadingEdit ? "Loading classroom…" : "Loading form…"}
           </div>
         ) : (
         <div className="space-y-4">
@@ -696,14 +810,16 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
           <Button
             type="button"
             className={cn("h-11 w-full", primaryBtn)}
-            disabled={creating}
-            onClick={() => void handleCreate()}
+            disabled={saving || loadingEdit}
+            onClick={() => void handleSave()}
           >
-            {creating ? (
+            {saving ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Creating…
+                {isEdit ? "Saving…" : "Creating…"}
               </>
+            ) : isEdit ? (
+              "Save Changes"
             ) : (
               "Create Classroom"
             )}

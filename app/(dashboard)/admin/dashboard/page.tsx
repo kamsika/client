@@ -5,6 +5,7 @@ import {
   GraduationCap,
   LayoutGrid,
   MessageSquare,
+  Pencil,
   School,
   Users,
 } from "lucide-react"
@@ -15,6 +16,7 @@ import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { AdminAddStudentForm } from "@/components/admin-add-student-form"
 import { AdminStaffSection } from "@/components/admin-staff-section"
 import { AdminStudentsSection } from "@/components/admin-students-section"
+import { Button } from "@/components/ui/button"
 import { CreateClassroomDialog } from "@/components/create-classroom-dialog"
 import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
@@ -43,6 +45,7 @@ function InstitutionAdminDashboard() {
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
+  const [editingClassroomId, setEditingClassroomId] = useState<number | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -164,6 +167,26 @@ function InstitutionAdminDashboard() {
                 )
               }}
             />
+            {editingClassroomId != null ? (
+              <CreateClassroomDialog
+                teachers={teachers}
+                editClassroomId={editingClassroomId}
+                open
+                onOpenChange={(next) => {
+                  if (!next) setEditingClassroomId(null)
+                }}
+                onUpdated={(classroom) => {
+                  setClassrooms((current) =>
+                    current
+                      .map((item) =>
+                        item.id === classroom.id ? { ...item, ...classroom } : item,
+                      )
+                      .sort((a, b) => a.name.localeCompare(b.name)),
+                  )
+                  setEditingClassroomId(null)
+                }}
+              />
+            ) : null}
           </div>
 
           <div className="divide-y divide-[#A2D4ED]/30">
@@ -199,6 +222,16 @@ function InstitutionAdminDashboard() {
                       </p>
                     </div>
                   </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 gap-1.5 border-[#A2D4ED] text-[#0047AB] hover:bg-[#ABD2F2]/40"
+                    onClick={() => setEditingClassroomId(cls.id)}
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit
+                  </Button>
                 </div>
               ))
             )}
