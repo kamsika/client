@@ -4,7 +4,6 @@ import {
   FileBarChart,
   LayoutDashboard,
   MessageSquare,
-  ScanFace,
   School,
   Upload,
   type LucideIcon,
@@ -58,12 +57,6 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       icon: ClipboardCheck,
     },
     {
-      href: "/admin/attendance/kiosk",
-      label: "Face Kiosk",
-      description: "Face recognition",
-      icon: ScanFace,
-    },
-    {
       href: "/admin/attendance/reports",
       label: "Reports",
       description: "Attendance analytics",
@@ -86,12 +79,6 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       label: "Import Students",
       description: "Bulk upload",
       icon: Upload,
-    },
-    {
-      href: "/admin/students/face",
-      label: "Face Registration",
-      description: "Student faces",
-      icon: ScanFace,
     },
   ]
 }

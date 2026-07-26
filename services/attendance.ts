@@ -28,6 +28,23 @@ export interface AttendanceSubjectOption {
   disabled?: boolean
 }
 
+/** Shape used by continuous-class subject pickers (scan/kiosk flows). */
+export type SelectableAttendanceSubject = {
+  id?: number
+  subjectId?: number
+  subjectName?: string
+  subject_name?: string
+  startTime?: string
+  start_time?: string
+  endTime?: string
+  end_time?: string
+  timeRange?: string
+  time_range?: string
+  isCurrent?: boolean
+  is_current?: boolean
+  continuous?: boolean
+}
+
 export type AttendanceScanResponse = {
   success?: boolean
   status?: string

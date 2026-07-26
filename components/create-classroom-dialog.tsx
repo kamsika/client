@@ -253,12 +253,13 @@ export function CreateClassroomDialog({
 
   useEffect(() => {
     if (!open || !isEdit || editClassroomId == null) return
+    const classroomId = editClassroomId
     let cancelled = false
 
     async function loadClassroom() {
       setLoadingEdit(true)
       try {
-        const classroom = await getClassroom(editClassroomId)
+        const classroom = await getClassroom(classroomId)
         if (cancelled) return
         const gradeState = gradeFromClassroom(classroom.grade)
         setName(classroom.name || "")
