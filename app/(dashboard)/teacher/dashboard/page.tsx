@@ -9,20 +9,14 @@ import { TeacherLiveQrScanner } from "@/components/teacher-live-qr-scanner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getStoredUser } from "@/lib/api-client"
+import { getTeacherNav } from "@/lib/teacher-nav"
 import type { User } from "@/types"
-
-const teacherNav = [
-  { href: "/teacher/dashboard", label: "Dashboard" },
-  { href: "/teacher/attendance", label: "Attendance" },
-  { href: "/teacher/attendance/kiosk", label: "Face Kiosk" },
-  { href: "/teacher/attendance/reports", label: "Reports" },
-]
 
 export default function TeacherDashboardPage() {
   const user = getStoredUser<User>()
 
   return (
-    <DashboardShell title="Teacher Dashboard" navItems={teacherNav} allowedRoles={["teacher"]}>
+    <DashboardShell title="Teacher Dashboard" navItems={getTeacherNav()} allowedRoles={["teacher"]}>
       <div className="grid gap-6">
         <Card>
           <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
