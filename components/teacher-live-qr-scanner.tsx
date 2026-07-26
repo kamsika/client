@@ -336,7 +336,7 @@ export function TeacherLiveQrScanner({
             </p>
             <p>
               {alreadyDetails[0] ||
-                `Already marked for ${alreadyMarked.join(", ") || "today"}.`}
+                "Attendance already marked for this subject today."}
             </p>
           </div>,
         )
@@ -390,7 +390,9 @@ export function TeacherLiveQrScanner({
         recentScansRef.current.set(scannedId, Date.now())
         setPreview((current) => (current ? { ...current, marked: true } : current))
         setScanStatus(`Already marked: ${scannedId}`)
-        toast.message(getApiErrorMessage(error, "Already scanned"))
+        toast.message(
+          getApiErrorMessage(error, "Attendance already marked for this subject today."),
+        )
         return
       }
       const message = getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`)

@@ -265,7 +265,45 @@ export interface TeacherAttendanceOverview {
     absentCount: number
     lateCount: number
     totalRecords?: number
+    gradesAttended?: number
+    grades_attended?: number
     selectedGrade?: string
+  }
+  analytics?: {
+    gradeWise?: Array<{
+      grade: string
+      totalStudents: number
+      presentCount: number
+      percentage: number
+    }>
+    grade_wise?: Array<{
+      grade: string
+      totalStudents: number
+      presentCount: number
+      percentage: number
+    }>
+    subjectWise?: Array<{
+      subject: string
+      totalStudents: number
+      presentCount: number
+      percentage: number
+    }>
+    subject_wise?: Array<{
+      subject: string
+      totalStudents: number
+      presentCount: number
+      percentage: number
+    }>
+    monthly?: Array<{
+      date: string
+      label: string
+      presentCount: number
+      recordCount: number
+    }>
+    gradesAttended?: string[]
+    grades_attended?: string[]
+    gradesAttendedCount?: number
+    grades_attended_count?: number
   }
   students: TeacherAttendanceStudentRow[]
   records?: TeacherAttendanceHistoryRecord[]

@@ -18,5 +18,7 @@ export function isAlreadyScannedError(error: unknown): boolean {
     | { already_scanned?: boolean; errors?: string[] }
     | undefined
   if (data?.already_scanned) return true
-  return Boolean(data?.errors?.some((msg) => /already scanned/i.test(msg)))
+  return Boolean(
+    data?.errors?.some((msg) => /already (scanned|marked)/i.test(msg)),
+  )
 }

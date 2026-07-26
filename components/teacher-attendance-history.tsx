@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Loader2, RefreshCw, Search, Users } from "lucide-react"
+import { Download, FileSpreadsheet, Loader2, RefreshCw, Search, Users } from "lucide-react"
 import { toast } from "sonner"
 
+import { TeacherAttendanceAnalytics } from "@/components/teacher-attendance-analytics"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import {
   APP_DISPLAY_TIMEZONE,
@@ -33,7 +34,11 @@ import {
   parseApiTimestamp,
 } from "@/lib/format-time"
 import { cn } from "@/lib/utils"
-import { getTeacherAttendance } from "@/services/teacher"
+import {
+  exportTeacherAttendanceCsv,
+  exportTeacherAttendancePdf,
+  getTeacherAttendance,
+} from "@/services/teacher"
 import type {
   TeacherAttendanceHistoryRecord,
   TeacherAttendanceOverview,
@@ -121,6 +126,7 @@ export function TeacherAttendanceHistory() {
   const [debouncedQuery, setDebouncedQuery] = useState("")
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null)
   const [overview, setOverview] = useState<TeacherAttendanceOverview | null>(null)
 
   useEffect(() => {
@@ -128,18 +134,23 @@ export function TeacherAttendanceHistory() {
     return () => window.clearTimeout(timer)
   }, [query])
 
+  const filterParams = useMemo(
+    () => ({
+      date: selectedDate,
+      grade: selectedGrade,
+      subject: selectedSubject,
+      search: debouncedQuery,
+    }),
+    [debouncedQuery, selectedDate, selectedGrade, selectedSubject],
+  )
+
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
       if (opts?.silent) setRefreshing(true)
       else setLoading(true)
 
       try {
-        const data = await getTeacherAttendance({
-          date: selectedDate,
-          grade: selectedGrade,
-          subject: selectedSubject,
-          search: debouncedQuery,
-        })
+        const data = await getTeacherAttendance(filterParams)
         setOverview(data)
       } catch (error) {
         if (!opts?.silent) {
@@ -151,7 +162,7 @@ export function TeacherAttendanceHistory() {
         setRefreshing(false)
       }
     },
-    [debouncedQuery, selectedDate, selectedGrade, selectedSubject],
+    [filterParams],
   )
 
   useEffect(() => {
@@ -172,9 +183,28 @@ export function TeacherAttendanceHistory() {
   const summary = overview?.summary
   const selectedGradeLabel =
     summary?.selectedGrade || overview?.selectedGrade || selectedGrade || "All"
+  const gradesAttended =
+    summary?.gradesAttended ??
+    summary?.grades_attended ??
+    overview?.analytics?.gradesAttendedCount ??
+    overview?.analytics?.grades_attended_count ??
+    0
 
   const dayLabel =
     selectedDate === localTodayISO() ? "Today" : formatAttendanceDayLabel(selectedDate)
+
+  async function handleExport(format: "csv" | "pdf") {
+    setExporting(format)
+    try {
+      if (format === "csv") await exportTeacherAttendanceCsv(filterParams)
+      else await exportTeacherAttendancePdf(filterParams)
+      toast.success(format === "csv" ? "Excel/CSV exported" : "PDF exported")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, `Failed to export ${format.toUpperCase()}`))
+    } finally {
+      setExporting(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -184,56 +214,60 @@ export function TeacherAttendanceHistory() {
             Attendance History
           </h2>
           <p className="mt-1 text-sm text-[#0047AB]/75">
-            Grade-wise attendance for {dayLabel}. Filter by grade, subject, or student.
+            Grade & subject attendance for {dayLabel}. Search, filter, export, and review analytics.
           </p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className={cn(outlineBtn, "shrink-0 self-start sm:self-auto")}
-          disabled={loading || refreshing}
-          onClick={() => void load()}
-        >
-          {refreshing ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <RefreshCw className="size-4" />
-          )}
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className={outlineBtn}
+            disabled={loading || exporting !== null}
+            onClick={() => void handleExport("csv")}
+          >
+            {exporting === "csv" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-4" />
+            )}
+            Export Excel
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className={outlineBtn}
+            disabled={loading || exporting !== null}
+            onClick={() => void handleExport("pdf")}
+          >
+            {exporting === "pdf" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            Export PDF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className={outlineBtn}
+            disabled={loading || refreshing}
+            onClick={() => void load()}
+          >
+            {refreshing ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className={cn(cardShell, "gap-2 py-4")}>
           <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
-              Present Today
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5">
-            <p className="text-2xl font-semibold tabular-nums text-emerald-700">
-              {summary?.presentCount ?? 0}
-            </p>
-            <p className="mt-0.5 text-xs text-[#0047AB]/70">Students marked Present / Late</p>
-          </CardContent>
-        </Card>
-        <Card className={cn(cardShell, "gap-2 py-4")}>
-          <CardHeader className="px-5 pb-0">
-            <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
-              Absent Today
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-5">
-            <p className="text-2xl font-semibold tabular-nums text-rose-700">
-              {summary?.absentCount ?? 0}
-            </p>
-            <p className="mt-0.5 text-xs text-[#0047AB]/70">Students with no check-in</p>
-          </CardContent>
-        </Card>
-        <Card className={cn(cardShell, "gap-2 py-4")}>
-          <CardHeader className="px-5 pb-0">
-            <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
-              Attendance Records
+              Total Attendance Records
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
@@ -246,17 +280,43 @@ export function TeacherAttendanceHistory() {
         <Card className={cn(cardShell, "gap-2 py-4")}>
           <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
-              Selected Grade
+              Total Present Students
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
-            <p className="flex items-center gap-2 text-xl font-semibold text-[#05082E] sm:text-2xl">
-              <Users className="size-5 shrink-0 text-[#0047AB]/70" />
-              <span className="truncate">{selectedGradeLabel}</span>
+            <p className="text-2xl font-semibold tabular-nums text-emerald-700">
+              {summary?.presentCount ?? 0}
             </p>
-            <p className="mt-0.5 text-xs text-[#0047AB]/70">
-              {summary?.totalStudents ?? 0} student
-              {(summary?.totalStudents ?? 0) === 1 ? "" : "s"} in view
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">Unique students Present / Late</p>
+          </CardContent>
+        </Card>
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
+            <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
+              Total Absent Students
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5">
+            <p className="text-2xl font-semibold tabular-nums text-rose-700">
+              {summary?.absentCount ?? 0}
+            </p>
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">Students with no check-in</p>
+          </CardContent>
+        </Card>
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
+            <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
+              Total Grades Attended
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5">
+            <p className="flex items-center gap-2 text-2xl font-semibold tabular-nums text-[#05082E]">
+              <Users className="size-5 shrink-0 text-[#0047AB]/70" />
+              {gradesAttended}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-[#0047AB]/70">
+              Filter: {selectedGradeLabel}
+              {selectedSubject !== "All" ? ` · ${selectedSubject}` : ""}
             </p>
           </CardContent>
         </Card>
@@ -349,93 +409,117 @@ export function TeacherAttendanceHistory() {
         </div>
       </div>
 
-      <div className={cn(cardShell, "overflow-hidden")}>
-        <Table className="min-w-[860px] table-fixed">
-          <TableHeader className="bg-[#f8fbfe]">
-            <TableRow className="border-[#A2D4ED]/40 hover:bg-[#f8fbfe]">
-              <TableHead className={cn(thClass, "w-[20%] text-left")}>Student Name</TableHead>
-              <TableHead className={cn(thClass, "w-[14%] text-left")}>Student ID</TableHead>
-              <TableHead className={cn(thClass, "w-[12%] text-center")}>Grade</TableHead>
-              <TableHead className={cn(thClass, "w-[16%] text-left")}>Subject</TableHead>
-              <TableHead className={cn(thClass, "w-[12%] text-left")}>Date</TableHead>
-              <TableHead className={cn(thClass, "w-[12%] text-left")}>Time</TableHead>
-              <TableHead className={cn(thClass, "w-[14%] text-center")}>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading attendance…
-                  </span>
-                </TableCell>
-              </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
-                  No attendance records match your filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              records.map((record, index) => (
-                <TableRow
-                  key={recordKey(record, index)}
-                  className={cn(
-                    "border-[#A2D4ED]/30",
-                    index % 2 === 0 ? "bg-white" : "bg-[#f8fbfe]/70",
-                    "hover:bg-[#A2D4ED]/15",
-                  )}
-                >
-                  <TableCell className={cn(tdClass, "text-left font-medium text-[#05082E]")}>
-                    <span className="block truncate">
-                      {record.fullName || "Unnamed student"}
-                    </span>
-                  </TableCell>
-                  <TableCell className={cn(tdClass, "text-left font-mono text-xs text-[#0047AB]")}>
-                    <span className="block truncate">{record.registrationNo}</span>
-                  </TableCell>
-                  <TableCell className={cn(tdClass, "text-center text-[#05082E]")}>
-                    <span className="block truncate">{record.grade || "—"}</span>
-                  </TableCell>
-                  <TableCell className={cn(tdClass, "text-left text-[#05082E]")}>
-                    <span className="block truncate">
-                      {record.subjectName || record.subject_name || "—"}
-                    </span>
-                  </TableCell>
-                  <TableCell
-                    className={cn(tdClass, "text-left whitespace-nowrap text-[#0047AB]/85")}
-                  >
-                    {formatDateOnly(record.date, selectedDate)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      tdClass,
-                      "text-left font-mono text-xs whitespace-nowrap text-[#0047AB]/85",
-                    )}
-                  >
-                    {formatTimeOnly(record.timestamp)}
-                  </TableCell>
-                  <TableCell className={cn(tdClass, "text-center")}>
-                    <div className="flex justify-center">
-                      <Badge
-                        variant="outline"
+      <Tabs defaultValue="history" className="gap-4">
+        <TabsList className="bg-[#f8fbfe]">
+          <TabsTrigger value="history">History Table</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="history" className="mt-0">
+          <div className={cn(cardShell, "overflow-hidden")}>
+            <Table className="min-w-[860px] table-fixed">
+              <TableHeader className="bg-[#f8fbfe]">
+                <TableRow className="border-[#A2D4ED]/40 hover:bg-[#f8fbfe]">
+                  <TableHead className={cn(thClass, "w-[20%] text-left")}>Student Name</TableHead>
+                  <TableHead className={cn(thClass, "w-[14%] text-left")}>Student ID</TableHead>
+                  <TableHead className={cn(thClass, "w-[12%] text-center")}>Grade</TableHead>
+                  <TableHead className={cn(thClass, "w-[16%] text-left")}>Subject</TableHead>
+                  <TableHead className={cn(thClass, "w-[12%] text-left")}>Date</TableHead>
+                  <TableHead className={cn(thClass, "w-[12%] text-left")}>Time</TableHead>
+                  <TableHead className={cn(thClass, "w-[14%] text-center")}>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Loader2 className="size-4 animate-spin" />
+                        Loading attendance…
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : records.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                      No attendance records match your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  records.map((record, index) => (
+                    <TableRow
+                      key={recordKey(record, index)}
+                      className={cn(
+                        "border-[#A2D4ED]/30",
+                        index % 2 === 0 ? "bg-white" : "bg-[#f8fbfe]/70",
+                        "hover:bg-[#A2D4ED]/15",
+                      )}
+                    >
+                      <TableCell className={cn(tdClass, "text-left font-medium text-[#05082E]")}>
+                        <span className="block truncate">
+                          {record.fullName || "Unnamed student"}
+                        </span>
+                      </TableCell>
+                      <TableCell
+                        className={cn(tdClass, "text-left font-mono text-xs text-[#0047AB]")}
+                      >
+                        <span className="block truncate">{record.registrationNo}</span>
+                      </TableCell>
+                      <TableCell className={cn(tdClass, "text-center text-[#05082E]")}>
+                        <span className="block truncate">{record.grade || "—"}</span>
+                      </TableCell>
+                      <TableCell className={cn(tdClass, "text-left text-[#05082E]")}>
+                        <span className="block truncate">
+                          {record.subjectName || record.subject_name || "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell
+                        className={cn(tdClass, "text-left whitespace-nowrap text-[#0047AB]/85")}
+                      >
+                        {formatDateOnly(record.date, selectedDate)}
+                      </TableCell>
+                      <TableCell
                         className={cn(
-                          "inline-flex min-w-[5.5rem] justify-center font-medium",
-                          statusBadgeClass(record.status),
+                          tdClass,
+                          "text-left font-mono text-xs whitespace-nowrap text-[#0047AB]/85",
                         )}
                       >
-                        {record.status}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                        {formatTimeOnly(record.timestamp)}
+                      </TableCell>
+                      <TableCell className={cn(tdClass, "text-center")}>
+                        <div className="flex justify-center">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "inline-flex min-w-[5.5rem] justify-center font-medium",
+                              statusBadgeClass(record.status),
+                            )}
+                          >
+                            {record.status}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-0">
+          {loading ? (
+            <div className={cn(cardShell, "flex h-48 items-center justify-center text-[#0047AB]/70")}>
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                Loading analytics…
+              </span>
+            </div>
+          ) : (
+            <TeacherAttendanceAnalytics analytics={overview?.analytics} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
