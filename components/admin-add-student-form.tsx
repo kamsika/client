@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { EnrolledSubjectsPicker } from "@/components/enrolled-subjects-picker"
 import { StudentQrCode } from "@/components/student-qr-code"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,6 +35,7 @@ const emptyForm = {
   section: "",
   gender: "" as GenderOption | "",
   contact: "",
+  enrolledSubjects: [] as string[],
 }
 
 export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminAddStudentFormProps) {
@@ -107,6 +109,7 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
         section: form.section.trim(),
         gender: form.gender,
         contact: form.contact.trim(),
+        enrolledSubjects: form.enrolledSubjects,
       })
 
       setSavedStudent(result.student)
@@ -163,6 +166,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
             <div>
               <span className="text-muted-foreground">Contact:</span>{" "}
               {savedStudent.contact || form.contact}
+            </div>
+            <div className="sm:col-span-2">
+              <span className="text-muted-foreground">Enrolled subjects:</span>{" "}
+              {(savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).length > 0
+                ? (savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).join(", ")
+                : "None"}
             </div>
           </dl>
 
@@ -268,6 +277,13 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
               placeholder="e.g. +94771234567"
               value={form.contact}
               onChange={(event) => setForm({ ...form, contact: event.target.value })}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <EnrolledSubjectsPicker
+              value={form.enrolledSubjects}
+              onChange={(enrolledSubjects) => setForm({ ...form, enrolledSubjects })}
             />
           </div>
 

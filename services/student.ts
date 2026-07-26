@@ -7,10 +7,31 @@ export interface CreateStudentInput {
   section: string
   gender: "Male" | "Female" | "Other"
   contact: string
+  enrolledSubjects?: string[]
+}
+
+export interface UpdateStudentInput {
+  full_name?: string
+  grade?: string
+  section?: string
+  gender?: "Male" | "Female" | "Other" | null
+  contact?: string
+  enrolledSubjects?: string[]
 }
 
 export async function createStudent(input: CreateStudentInput) {
-  const { data } = await apiClient.post<{ student: Student; message: string }>("/api/students", input)
+  const { data } = await apiClient.post<{ student: Student; message: string }>("/api/students", {
+    ...input,
+    enrolledSubjects: input.enrolledSubjects ?? [],
+  })
+  return data
+}
+
+export async function updateStudent(studentId: number, input: UpdateStudentInput) {
+  const { data } = await apiClient.patch<{ student: Student; message: string }>(
+    `/api/students/${studentId}`,
+    input,
+  )
   return data
 }
 

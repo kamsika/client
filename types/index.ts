@@ -41,6 +41,8 @@ export interface Student {
   parent_name: string | null
   parent_phone: string | null
   has_face_descriptor?: boolean
+  enrolled_subjects?: string[]
+  enrolledSubjects?: string[]
 }
 
 export interface Attendance {

@@ -21,6 +21,7 @@ import type { Student } from "@/types"
 interface AdminStudentsSectionProps {
   students: Student[]
   loading?: boolean
+  onStudentUpdated?: (student: Student) => void
 }
 
 function studentQrLabel(student: Student) {
@@ -28,7 +29,11 @@ function studentQrLabel(student: Student) {
   return `${name} (${student.registration_no})`
 }
 
-export function AdminStudentsSection({ students, loading = false }: AdminStudentsSectionProps) {
+export function AdminStudentsSection({
+  students,
+  loading = false,
+  onStudentUpdated,
+}: AdminStudentsSectionProps) {
   const [query, setQuery] = useState("")
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
@@ -135,6 +140,10 @@ export function AdminStudentsSection({ students, loading = false }: AdminStudent
             <AdminStudentProfile
               key={`profile-${selectedStudent.id}-${selectedStudent.registration_no}`}
               student={selectedStudent}
+              onStudentUpdated={(updated) => {
+                setSelectedStudent(updated)
+                onStudentUpdated?.(updated)
+              }}
             />
           )}
         </DialogContent>

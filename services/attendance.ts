@@ -6,6 +6,39 @@ import type {
   StudentAttendanceHistoryResponse,
 } from "@/types"
 
+export type AttendanceScanResponse = {
+  success?: boolean
+  status?: string
+  message?: string
+  studentId?: number
+  studentName?: string | null
+  registrationNo?: string
+  enrolledSubjects?: string[]
+  enrolled_subjects?: string[]
+  todayTimetable?: Array<{
+    subjectName?: string
+    subject_name?: string
+    startTime?: string
+    start_time?: string
+    endTime?: string
+    end_time?: string
+  }>
+  autoMarkedSubjects?: string[]
+  newlyMarkedSubjects?: string[]
+  alreadyMarkedSubjects?: string[]
+  autoMarkedDetails?: Array<{
+    subjectName?: string
+    subject_name?: string
+    status?: string
+    continuousClass?: boolean
+    label?: string
+  }>
+  data?: Attendance
+  attendance?: Attendance
+  records?: Attendance[]
+  delta_minutes?: number
+}
+
 export async function markAttendanceByScan(
   scannedStudentId: string,
   classroomId: number,
@@ -30,16 +63,13 @@ export async function scanCenterAttendance(payload: {
   classroomId?: number
 }) {
   console.log("Sending student ID to API:", payload.scannedStudentId)
-  const { data } = await apiClient.post<{ attendance: Attendance; delta_minutes: number }>(
-    "/api/attendance/scan",
-    {
-      student_id: payload.scannedStudentId,
-      classroom_id: payload.classroomId,
-      status: "Present",
-      scanned_at: new Date().toISOString(),
-      prevent_duplicate: true,
-    },
-  )
+  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", {
+    student_id: payload.scannedStudentId,
+    classroom_id: payload.classroomId,
+    status: "Present",
+    scanned_at: new Date().toISOString(),
+    prevent_duplicate: true,
+  })
   return data
 }
 
@@ -81,17 +111,7 @@ export async function markKioskAttendance(payload: {
   classroomId: number
   timestamp?: string
 }) {
-  const { data } = await apiClient.post<{
-    success: true
-    status: "Present"
-    message: string
-    autoMarkedSubjects?: string[]
-    newlyMarkedSubjects?: string[]
-    alreadyMarkedSubjects?: string[]
-    data: Attendance
-    attendance: Attendance
-    records?: Attendance[]
-  }>(
+  const { data } = await apiClient.post<AttendanceScanResponse>(
     "/api/attendance",
     {
       studentId: payload.studentId,

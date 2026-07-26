@@ -45,7 +45,7 @@ import type { Classroom } from "@/types"
 const DETECT_INTERVAL_MS = 300
 /** Default per-student cooldown between kiosk attendance triggers. */
 export const KIOSK_COOLDOWN_MS = 5000
-const FEEDBACK_MS = 3500
+const FEEDBACK_MS = 5500
 
 interface KioskLogEntry {
   id: string
@@ -55,6 +55,8 @@ interface KioskLogEntry {
   status: string
   timeLabel: string
   distance: number
+  enrolledSubjects: string[]
+  autoMarkedDetails: string[]
 }
 
 interface RecognizedStudent {
@@ -63,6 +65,8 @@ interface RecognizedStudent {
   registrationNo: string
   status: string
   distance: number
+  enrolledSubjects: string[]
+  autoMarkedDetails: string[]
 }
 
 interface KioskAttendanceScreenProps {
@@ -334,6 +338,11 @@ export function KioskAttendanceScreen({
 
       const attendance = result.attendance ?? result.data
       const subjects = result.autoMarkedSubjects ?? result.newlyMarkedSubjects ?? []
+      const enrolledSubjects =
+        result.enrolledSubjects ?? result.enrolled_subjects ?? []
+      const autoMarkedDetails = (result.autoMarkedDetails ?? []).map(
+        (item) => item.label || `${item.subjectName ?? item.subject_name} - Present`,
+      )
       const status =
         subjects.length > 0
           ? `Present · ${subjects.join(", ")}`
@@ -342,14 +351,22 @@ export function KioskAttendanceScreen({
         /already marked/i.test(result.message || "") &&
         !(result.newlyMarkedSubjects && result.newlyMarkedSubjects.length > 0)
 
+      const displayName = result.studentName || name
+      const displayReg = result.registrationNo || registrationNo
+
       if (!alreadyToday) {
         playSuccessChime()
         setRecognized({
           studentId,
-          name,
-          registrationNo,
+          name: displayName,
+          registrationNo: displayReg,
           status,
           distance,
+          enrolledSubjects,
+          autoMarkedDetails:
+            autoMarkedDetails.length > 0
+              ? autoMarkedDetails
+              : subjects.map((subject) => `${subject} - Present`),
         })
         if (subjects.length > 0) {
           toast.success(`Auto-marked: ${subjects.join(", ")}`)
@@ -362,11 +379,16 @@ export function KioskAttendanceScreen({
             {
               id: String(studentId),
               studentId,
-              name,
-              registrationNo,
+              name: displayName,
+              registrationNo: displayReg,
               status,
               timeLabel: formatClock(new Date()),
               distance,
+              enrolledSubjects,
+              autoMarkedDetails:
+                autoMarkedDetails.length > 0
+                  ? autoMarkedDetails
+                  : subjects.map((subject) => `${subject} - Present`),
             },
             ...prev,
           ].slice(0, 40)
@@ -375,13 +397,18 @@ export function KioskAttendanceScreen({
         // Backend says already marked today — track in session, skip list duplicate.
         setRecognized({
           studentId,
-          name,
-          registrationNo,
+          name: displayName,
+          registrationNo: displayReg,
           status:
             subjects.length > 0
               ? `Already Marked · ${subjects.join(", ")}`
               : "Already Marked Today",
           distance,
+          enrolledSubjects,
+          autoMarkedDetails:
+            autoMarkedDetails.length > 0
+              ? autoMarkedDetails
+              : subjects.map((subject) => `${subject} - Present`),
         })
       }
     } catch (error) {
@@ -393,6 +420,8 @@ export function KioskAttendanceScreen({
           registrationNo,
           status: "Already Marked Today",
           distance,
+          enrolledSubjects: [],
+          autoMarkedDetails: [],
         })
       } else {
         recentDetectionsRef.current.delete(studentId)
@@ -612,18 +641,58 @@ export function KioskAttendanceScreen({
         {/* Recognition feedback card */}
         {recognized && (
           <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
-            <div className="flex w-full max-w-md items-center gap-4 rounded-2xl border border-emerald-400/40 bg-emerald-950/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300">
-              <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-xl font-bold text-emerald-950">
-                {initials(recognized.name)}
+            <div className="flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-950/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300">
+              <div className="flex items-center gap-4">
+                <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-xl font-bold text-emerald-950">
+                  {initials(recognized.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-semibold text-white">
+                    {recognized.name}
+                  </p>
+                  <p className="truncate text-sm text-emerald-200/80">
+                    ID: {recognized.registrationNo}
+                  </p>
+                </div>
+                <Badge className="shrink-0 gap-1 border-0 bg-emerald-400 text-emerald-950">
+                  <CheckCircle2 className="size-3.5" />
+                  {recognized.status}
+                </Badge>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-lg font-semibold text-white">{recognized.name}</p>
-                <p className="truncate text-sm text-emerald-200/80">{recognized.registrationNo}</p>
-              </div>
-              <Badge className="shrink-0 gap-1 border-0 bg-emerald-400 text-emerald-950">
-                <CheckCircle2 className="size-3.5" />
-                {recognized.status}
-              </Badge>
+
+              {recognized.enrolledSubjects.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium tracking-wide text-emerald-200/70 uppercase">
+                    Enrolled Subjects
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {recognized.enrolledSubjects.map((subject) => (
+                      <Badge
+                        key={subject}
+                        className="border-0 bg-sky-400/20 text-sky-100"
+                      >
+                        {subject}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {recognized.autoMarkedDetails.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium tracking-wide text-emerald-200/70 uppercase">
+                    Auto-Marked Subjects Today
+                  </p>
+                  <ul className="space-y-1 text-sm text-emerald-50">
+                    {recognized.autoMarkedDetails.map((detail) => (
+                      <li key={detail} className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
+                        <span>{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -680,15 +749,29 @@ export function KioskAttendanceScreen({
           ) : (
             <ul className="divide-y">
               {log.map((entry) => (
-                <li key={entry.id} className="flex items-center gap-3 px-4 py-3">
+                <li key={entry.id} className="flex items-start gap-3 px-4 py-3">
                   <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                     {initials(entry.name)}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 space-y-1">
                     <p className="truncate text-sm font-medium">{entry.name}</p>
                     <p className="text-muted-foreground truncate text-xs">
-                      {entry.registrationNo} · d={entry.distance.toFixed(2)}
+                      ID: {entry.registrationNo}
                     </p>
+                    {entry.enrolledSubjects.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {entry.enrolledSubjects.map((subject) => (
+                          <Badge key={subject} variant="outline" className="text-[10px]">
+                            {subject}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {entry.autoMarkedDetails.length > 0 && (
+                      <p className="text-muted-foreground text-[11px]">
+                        {entry.autoMarkedDetails.join(" · ")}
+                      </p>
+                    )}
                   </div>
                   <div className="shrink-0 text-right">
                     <Badge

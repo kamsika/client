@@ -1,18 +1,23 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 
+import { EnrolledSubjectsPicker } from "@/components/enrolled-subjects-picker"
 import { StudentQrCode } from "@/components/student-qr-code"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { getApiErrorMessage } from "@/lib/api-errors"
 import { downloadStudentQrCanvas, printStudentQrCanvas } from "@/lib/download-qr-image"
 import { buildStudentQrPayload, studentInitials } from "@/lib/student-qr-payload"
+import { updateStudent } from "@/services/student"
 import type { Student } from "@/types"
 
 interface AdminStudentProfileProps {
   student: Student
+  onStudentUpdated?: (student: Student) => void
 }
 
 function displayContact(student: Student) {
@@ -24,11 +29,20 @@ function studentQrLabel(student: Student) {
   return `${name} (${student.registration_no})`
 }
 
-export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
+function enrolledList(student: Student) {
+  return student.enrolledSubjects ?? student.enrolled_subjects ?? []
+}
+
+export function AdminStudentProfile({ student, onStudentUpdated }: AdminStudentProfileProps) {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
-  // Prefer registration_no as the scannable student ID (unique per center).
   const qrPayload = buildStudentQrPayload(student.registration_no)
   const label = studentQrLabel(student)
+  const [enrolledSubjects, setEnrolledSubjects] = useState<string[]>(() => enrolledList(student))
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setEnrolledSubjects(enrolledList(student))
+  }, [student])
 
   useEffect(() => {
     console.log("[QR] Profile QR for", {
@@ -67,6 +81,19 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
       toast.error(error instanceof Error ? error.message : "Failed to print QR code")
     }
   }, [qrPayload])
+
+  async function handleSaveSubjects() {
+    setSaving(true)
+    try {
+      const result = await updateStudent(student.id, { enrolledSubjects })
+      onStudentUpdated?.(result.student)
+      toast.success("Enrolled subjects updated")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update enrolled subjects"))
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="grid gap-6 md:grid-cols-[1fr_auto]">
@@ -109,7 +136,26 @@ export function AdminStudentProfile({ student }: AdminStudentProfileProps) {
             <dt className="text-muted-foreground">Contact</dt>
             <dd>{displayContact(student)}</dd>
           </div>
+          <div className="grid grid-cols-[120px_1fr] gap-2">
+            <dt className="text-muted-foreground">Enrolled</dt>
+            <dd className="flex flex-wrap gap-1.5">
+              {enrolledList(student).length > 0 ? (
+                enrolledList(student).map((subject) => (
+                  <Badge key={subject} variant="secondary">
+                    {subject}
+                  </Badge>
+                ))
+              ) : (
+                <span>—</span>
+              )}
+            </dd>
+          </div>
         </dl>
+
+        <EnrolledSubjectsPicker value={enrolledSubjects} onChange={setEnrolledSubjects} />
+        <Button type="button" onClick={() => void handleSaveSubjects()} disabled={saving}>
+          {saving ? "Saving…" : "Save Enrolled Subjects"}
+        </Button>
       </div>
 
       <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-5 text-black">

@@ -203,15 +203,57 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           classroomId,
         })
         recentScansRef.current.set(scannedId, now)
-        const labeled =
-          result.attendance.registration_no ||
-          result.attendance.student_name ||
+
+        const attendance = result.attendance ?? result.data
+        const name =
+          result.studentName ||
+          attendance?.student_name ||
+          "Student"
+        const regNo =
+          result.registrationNo ||
+          attendance?.registration_no ||
           scannedId
-        setLastScan(`${labeled} ← scanned ${scannedId}`)
-        toast.success(
-          `Marked present: ${result.attendance.student_name || "Student"} (${result.attendance.registration_no || scannedId})`,
+        const enrolled =
+          result.enrolledSubjects ?? result.enrolled_subjects ?? []
+        const autoDetails = (result.autoMarkedDetails ?? []).map(
+          (item) => item.label || `${item.subjectName ?? item.subject_name} - Present`,
         )
-        onMarked?.(result.attendance)
+        const subjects = result.autoMarkedSubjects ?? result.newlyMarkedSubjects ?? []
+
+        setLastScan(
+          [
+            `${name} (${regNo})`,
+            enrolled.length ? `Enrolled: ${enrolled.join(", ")}` : null,
+            autoDetails.length
+              ? `Auto-marked: ${autoDetails.join("; ")}`
+              : subjects.length
+                ? `Auto-marked: ${subjects.join(", ")}`
+                : "Present",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        )
+
+        toast.success(
+          <div className="space-y-1 text-sm">
+            <p className="font-semibold">
+              {name} · ID {regNo}
+            </p>
+            {enrolled.length > 0 && (
+              <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
+            )}
+            {autoDetails.length > 0 ? (
+              <p>Auto-marked: {autoDetails.join("; ")}</p>
+            ) : subjects.length > 0 ? (
+              <p>Auto-marked: {subjects.join(", ")}</p>
+            ) : (
+              <p>Marked Present</p>
+            )}
+          </div>,
+        )
+        if (attendance) {
+          onMarked?.(attendance)
+        }
       } catch (error) {
         if (isAlreadyScannedError(error)) {
           recentScansRef.current.set(scannedId, now)

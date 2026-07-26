@@ -460,7 +460,15 @@ export default function AdminDashboardPage() {
               existingStudents={students}
               onStudentAdded={(student) => setStudents((current) => [...current, student])}
             />
-            <AdminStudentsSection students={students} loading={loadingStudents} />
+            <AdminStudentsSection
+              students={students}
+              loading={loadingStudents}
+              onStudentUpdated={(updated) =>
+                setStudents((current) =>
+                  current.map((student) => (student.id === updated.id ? updated : student)),
+                )
+              }
+            />
           </>
         )}
 
