@@ -43,6 +43,11 @@ export interface Student {
   has_face_descriptor?: boolean
   enrolled_subjects?: string[]
   enrolledSubjects?: string[]
+  classroom_id?: number | null
+  classroomId?: number | null
+  classroom_name?: string | null
+  classroomName?: string | null
+  classroom?: { id: number; name: string } | null
 }
 
 export interface Attendance {
