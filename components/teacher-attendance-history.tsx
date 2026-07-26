@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Loader2, RefreshCw, Search, Users } from "lucide-react"
 import { toast } from "sonner"
 
-import { AttendanceDatePicker } from "@/components/attendance-date-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +26,12 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getApiErrorMessage } from "@/lib/api-errors"
-import { formatAttendanceDayLabel, formatLocalTime, localTodayISO } from "@/lib/format-time"
+import {
+  APP_DISPLAY_TIMEZONE,
+  formatAttendanceDayLabel,
+  localTodayISO,
+  parseApiTimestamp,
+} from "@/lib/format-time"
 import { cn } from "@/lib/utils"
 import { getTeacherAttendance } from "@/services/teacher"
 import type {
@@ -44,6 +48,9 @@ const fieldClass =
 const outlineBtn =
   "border-[#A2D4ED] text-[#0047AB] transition hover:bg-[#ABD2F2]/40"
 
+const filterLabelClass =
+  "flex h-5 items-center text-sm font-medium leading-none text-[#05082E]"
+
 const DEFAULT_GRADE_TABS = [
   "All",
   "Grade 5",
@@ -57,14 +64,42 @@ const DEFAULT_GRADE_TABS = [
   "Grade 13",
 ]
 
-function formatCheckInTime(timestamp: string | null) {
-  if (!timestamp) return "—"
-  return formatLocalTime(timestamp, {
-    hour: "2-digit",
+const thClass =
+  "h-11 px-3 align-middle text-xs font-semibold tracking-wide whitespace-nowrap text-[#0047AB] uppercase"
+
+const tdClass = "h-12 px-3 align-middle text-sm"
+
+function formatDateOnly(dateISO: string | null | undefined, fallbackISO: string) {
+  const raw = String(dateISO || fallbackISO || "").trim()
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  const value = match?.[1] ?? ""
+  if (!value) return "—"
+  const [year, month, day] = value.split("-").map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12))
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+}
+
+function formatTimeOnly(timestamp: string | null | undefined) {
+  const date = parseApiTimestamp(timestamp)
+  if (!date) return "—"
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    second: undefined,
-  })
+    timeZone: APP_DISPLAY_TIMEZONE,
+  }).formatToParts(date)
+
+  const hour = parts.find((part) => part.type === "hour")?.value
+  const minute = parts.find((part) => part.type === "minute")?.value
+  const dayPeriod = parts.find((part) => part.type === "dayPeriod")?.value
+  if (!hour || !minute) return "—"
+  return dayPeriod ? `${hour}:${minute} ${dayPeriod}` : `${hour}:${minute}`
 }
 
 function statusBadgeClass(status: TeacherAttendanceHistoryRecord["status"]) {
@@ -138,22 +173,24 @@ export function TeacherAttendanceHistory() {
   const selectedGradeLabel =
     summary?.selectedGrade || overview?.selectedGrade || selectedGrade || "All"
 
+  const dayLabel =
+    selectedDate === localTodayISO() ? "Today" : formatAttendanceDayLabel(selectedDate)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight text-[#05082E]">
             Attendance History
           </h2>
-          <p className="text-sm text-[#0047AB]/75">
-            Grade-wise attendance for {formatAttendanceDayLabel(selectedDate)}. Filter by grade,
-            subject, or student without reloading the page.
+          <p className="mt-1 text-sm text-[#0047AB]/75">
+            Grade-wise attendance for {dayLabel}. Filter by grade, subject, or student.
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
-          className={outlineBtn}
+          className={cn(outlineBtn, "shrink-0 self-start sm:self-auto")}
           disabled={loading || refreshing}
           onClick={() => void load()}
         >
@@ -167,55 +204,57 @@ export function TeacherAttendanceHistory() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className={cn(cardShell, "py-4")}>
-          <CardHeader className="px-5 pb-1">
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
               Present Today
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
-            <p className="text-2xl font-semibold text-emerald-700">
+            <p className="text-2xl font-semibold tabular-nums text-emerald-700">
               {summary?.presentCount ?? 0}
             </p>
-            <p className="text-xs text-[#0047AB]/70">Students marked Present / Late</p>
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">Students marked Present / Late</p>
           </CardContent>
         </Card>
-        <Card className={cn(cardShell, "py-4")}>
-          <CardHeader className="px-5 pb-1">
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
               Absent Today
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
-            <p className="text-2xl font-semibold text-rose-700">{summary?.absentCount ?? 0}</p>
-            <p className="text-xs text-[#0047AB]/70">Students with no check-in</p>
+            <p className="text-2xl font-semibold tabular-nums text-rose-700">
+              {summary?.absentCount ?? 0}
+            </p>
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">Students with no check-in</p>
           </CardContent>
         </Card>
-        <Card className={cn(cardShell, "py-4")}>
-          <CardHeader className="px-5 pb-1">
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
               Attendance Records
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
-            <p className="text-2xl font-semibold text-[#05082E]">
+            <p className="text-2xl font-semibold tabular-nums text-[#05082E]">
               {summary?.totalRecords ?? 0}
             </p>
-            <p className="text-xs text-[#0047AB]/70">Subject-level Present / Late marks</p>
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">Subject-level Present / Late marks</p>
           </CardContent>
         </Card>
-        <Card className={cn(cardShell, "py-4")}>
-          <CardHeader className="px-5 pb-1">
+        <Card className={cn(cardShell, "gap-2 py-4")}>
+          <CardHeader className="px-5 pb-0">
             <CardTitle className="text-xs font-medium tracking-wide text-[#0047AB]/75 uppercase">
               Selected Grade
             </CardTitle>
           </CardHeader>
           <CardContent className="px-5">
-            <p className="flex items-center gap-2 text-2xl font-semibold text-[#05082E]">
-              <Users className="size-5 text-[#0047AB]/70" />
-              {selectedGradeLabel}
+            <p className="flex items-center gap-2 text-xl font-semibold text-[#05082E] sm:text-2xl">
+              <Users className="size-5 shrink-0 text-[#0047AB]/70" />
+              <span className="truncate">{selectedGradeLabel}</span>
             </p>
-            <p className="text-xs text-[#0047AB]/70">
+            <p className="mt-0.5 text-xs text-[#0047AB]/70">
               {summary?.totalStudents ?? 0} student
               {(summary?.totalStudents ?? 0) === 1 ? "" : "s"} in view
             </p>
@@ -223,9 +262,9 @@ export function TeacherAttendanceHistory() {
         </Card>
       </div>
 
-      <div className={cn(cardShell, "space-y-4 p-5")}>
+      <div className={cn(cardShell, "space-y-4 p-4 sm:p-5")}>
         <div className="space-y-2">
-          <Label className="text-[#05082E]">Grade</Label>
+          <Label className={filterLabelClass}>Grade</Label>
           <Tabs
             value={selectedGrade}
             onValueChange={(value) => value && setSelectedGrade(value)}
@@ -239,9 +278,7 @@ export function TeacherAttendanceHistory() {
                 <TabsTrigger
                   key={grade}
                   value={grade}
-                  className={cn(
-                    "rounded-lg border border-transparent px-3 py-1.5 text-sm data-active:border-[#A2D4ED] data-active:bg-[#f8fbfe] data-active:text-[#05082E]",
-                  )}
+                  className="rounded-lg border border-transparent px-3 py-1.5 text-sm data-active:border-[#A2D4ED] data-active:bg-[#f8fbfe] data-active:text-[#05082E]"
                 >
                   {grade}
                 </TabsTrigger>
@@ -250,23 +287,37 @@ export function TeacherAttendanceHistory() {
           </Tabs>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label className="text-[#05082E]">Date</Label>
-            <AttendanceDatePicker
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid min-w-0 grid-rows-[1.25rem_2.5rem] items-center gap-2">
+            <Label htmlFor="teacher-attendance-history-date" className={filterLabelClass}>
+              Date
+            </Label>
+            <Input
               id="teacher-attendance-history-date"
+              type="date"
               value={selectedDate}
-              onChange={setSelectedDate}
-              className="w-full"
+              max={localTodayISO()}
+              className={cn(
+                fieldClass,
+                "box-border h-10 w-full min-h-10 max-h-10 py-0 leading-none",
+                "[&::-webkit-calendar-picker-indicator]:my-0 [&::-webkit-datetime-edit]:m-0 [&::-webkit-datetime-edit]:p-0",
+              )}
+              onChange={(event) => {
+                const next = event.target.value
+                if (!next) return
+                const today = localTodayISO()
+                setSelectedDate(next > today ? today : next)
+              }}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[#05082E]">Subject</Label>
+
+          <div className="grid min-w-0 grid-rows-[1.25rem_2.5rem] items-center gap-2">
+            <Label className={filterLabelClass}>Subject</Label>
             <Select
               value={selectedSubject}
               onValueChange={(value) => value && setSelectedSubject(value)}
             >
-              <SelectTrigger className={cn(fieldClass, "w-full")}>
+              <SelectTrigger className={cn(fieldClass, "h-10 w-full min-h-10 max-h-10")}>
                 <SelectValue placeholder="All subjects" />
               </SelectTrigger>
               <SelectContent>
@@ -279,12 +330,16 @@ export function TeacherAttendanceHistory() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[#05082E]">Search</Label>
-            <div className="relative">
-              <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#A2D4ED]" />
+
+          <div className="grid min-w-0 grid-rows-[1.25rem_2.5rem] items-center gap-2">
+            <Label htmlFor="teacher-attendance-history-search" className={filterLabelClass}>
+              Search
+            </Label>
+            <div className="relative h-10 w-full">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-[#A2D4ED]" />
               <Input
-                className={cn(fieldClass, "pl-9")}
+                id="teacher-attendance-history-search"
+                className={cn(fieldClass, "h-10 w-full min-h-10 max-h-10 pl-9")}
                 placeholder="Student name or ID…"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -295,71 +350,91 @@ export function TeacherAttendanceHistory() {
       </div>
 
       <div className={cn(cardShell, "overflow-hidden")}>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[#A2D4ED]/40 bg-[#f8fbfe] hover:bg-[#f8fbfe]">
-                <TableHead className="text-[#0047AB]">Student Name</TableHead>
-                <TableHead className="text-[#0047AB]">Student ID</TableHead>
-                <TableHead className="text-[#0047AB]">Grade</TableHead>
-                <TableHead className="text-[#0047AB]">Subject</TableHead>
-                <TableHead className="text-[#0047AB]">Attendance Date</TableHead>
-                <TableHead className="text-[#0047AB]">Attendance Time</TableHead>
-                <TableHead className="text-[#0047AB]">Status</TableHead>
+        <Table className="min-w-[860px] table-fixed">
+          <TableHeader className="bg-[#f8fbfe]">
+            <TableRow className="border-[#A2D4ED]/40 hover:bg-[#f8fbfe]">
+              <TableHead className={cn(thClass, "w-[20%] text-left")}>Student Name</TableHead>
+              <TableHead className={cn(thClass, "w-[14%] text-left")}>Student ID</TableHead>
+              <TableHead className={cn(thClass, "w-[12%] text-center")}>Grade</TableHead>
+              <TableHead className={cn(thClass, "w-[16%] text-left")}>Subject</TableHead>
+              <TableHead className={cn(thClass, "w-[12%] text-left")}>Date</TableHead>
+              <TableHead className={cn(thClass, "w-[12%] text-left")}>Time</TableHead>
+              <TableHead className={cn(thClass, "w-[14%] text-center")}>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading attendance…
+                  </span>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-[#0047AB]/70">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" />
-                      Loading attendance…
+            ) : records.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                  No attendance records match your filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              records.map((record, index) => (
+                <TableRow
+                  key={recordKey(record, index)}
+                  className={cn(
+                    "border-[#A2D4ED]/30",
+                    index % 2 === 0 ? "bg-white" : "bg-[#f8fbfe]/70",
+                    "hover:bg-[#A2D4ED]/15",
+                  )}
+                >
+                  <TableCell className={cn(tdClass, "text-left font-medium text-[#05082E]")}>
+                    <span className="block truncate">
+                      {record.fullName || "Unnamed student"}
                     </span>
                   </TableCell>
-                </TableRow>
-              ) : records.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-[#0047AB]/70">
-                    No attendance records match your filters.
+                  <TableCell className={cn(tdClass, "text-left font-mono text-xs text-[#0047AB]")}>
+                    <span className="block truncate">{record.registrationNo}</span>
                   </TableCell>
-                </TableRow>
-              ) : (
-                records.map((record, index) => (
-                  <TableRow
-                    key={recordKey(record, index)}
-                    className="border-[#A2D4ED]/30 hover:bg-[#A2D4ED]/10"
-                  >
-                    <TableCell className="font-medium text-[#05082E]">
-                      {record.fullName || "Unnamed student"}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-[#0047AB]">
-                      {record.registrationNo}
-                    </TableCell>
-                    <TableCell className="text-[#05082E]">{record.grade || "—"}</TableCell>
-                    <TableCell className="text-[#05082E]">
+                  <TableCell className={cn(tdClass, "text-center text-[#05082E]")}>
+                    <span className="block truncate">{record.grade || "—"}</span>
+                  </TableCell>
+                  <TableCell className={cn(tdClass, "text-left text-[#05082E]")}>
+                    <span className="block truncate">
                       {record.subjectName || record.subject_name || "—"}
-                    </TableCell>
-                    <TableCell className="text-[#0047AB]/80">
-                      {record.date || selectedDate}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-[#0047AB]/80">
-                      {formatCheckInTime(record.timestamp)}
-                    </TableCell>
-                    <TableCell>
+                    </span>
+                  </TableCell>
+                  <TableCell
+                    className={cn(tdClass, "text-left whitespace-nowrap text-[#0047AB]/85")}
+                  >
+                    {formatDateOnly(record.date, selectedDate)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      tdClass,
+                      "text-left font-mono text-xs whitespace-nowrap text-[#0047AB]/85",
+                    )}
+                  >
+                    {formatTimeOnly(record.timestamp)}
+                  </TableCell>
+                  <TableCell className={cn(tdClass, "text-center")}>
+                    <div className="flex justify-center">
                       <Badge
                         variant="outline"
-                        className={cn("font-medium", statusBadgeClass(record.status))}
+                        className={cn(
+                          "inline-flex min-w-[5.5rem] justify-center font-medium",
+                          statusBadgeClass(record.status),
+                        )}
                       >
                         {record.status}
                       </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )
