@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
+  AlertTriangle,
   Camera,
   CheckCircle2,
   CircleDot,
@@ -56,17 +57,21 @@ interface KioskLogEntry {
   timeLabel: string
   distance: number
   enrolledSubjects: string[]
-  autoMarkedDetails: string[]
+  presentNowDetails: string[]
+  alreadyMarkedDetails: string[]
 }
 
 interface RecognizedStudent {
   studentId: number
   name: string
   registrationNo: string
+  /** present | already | noclass | mixed */
+  mode: "present" | "already" | "noclass" | "mixed"
   status: string
   distance: number
   enrolledSubjects: string[]
-  autoMarkedDetails: string[]
+  presentNowDetails: string[]
+  alreadyMarkedDetails: string[]
 }
 
 interface KioskAttendanceScreenProps {
@@ -119,8 +124,6 @@ export function KioskAttendanceScreen({
   const profilesByIdRef = useRef<Map<number, { label: string; registrationNo: string }>>(new Map())
   /** studentId → last successful / attempted mark timestamp (ms). */
   const recentDetectionsRef = useRef<Map<number, number>>(new Map())
-  /** Students already marked successfully in this kiosk session (unique UI + API). */
-  const markedStudentIdsRef = useRef<Set<number>>(new Set())
   const markingRef = useRef(false)
   const detectingRef = useRef(false)
   const classroomIdRef = useRef<number | null>(null)
@@ -154,8 +157,7 @@ export function KioskAttendanceScreen({
 
   useEffect(() => {
     classroomIdRef.current = classroomId ? Number(classroomId) : null
-    // New classroom = new session uniqueness scope.
-    markedStudentIdsRef.current.clear()
+    // New classroom = reset cooldown / feedback scope.
     recentDetectionsRef.current.clear()
     setLog([])
     setRecognized(null)
@@ -289,20 +291,13 @@ export function KioskAttendanceScreen({
     setScanning(false)
     setRecognized(null)
     recentDetectionsRef.current.clear()
-    // Keep markedStudentIds for the session so restarting the camera
-    // does not re-mark or re-log the same students.
   }
 
   const recordMatch = useCallback(async (studentId: number, distance: number) => {
-    // Session uniqueness: never re-call API or append duplicate UI rows.
-    if (markedStudentIdsRef.current.has(studentId)) {
-      return
-    }
-
     const now = Date.now()
     const cooldownWindow = cooldownMsRef.current
 
-    // Short cooldown still blocks parallel frames before the set is updated.
+    // Per-student cooldown only — do NOT block the rest of the day.
     if (isWithinCooldown(recentDetectionsRef.current, studentId, now, cooldownWindow)) {
       return
     }
@@ -333,96 +328,116 @@ export function KioskAttendanceScreen({
         timestamp,
       })
 
-      // Mark as handled for this session before updating UI.
-      markedStudentIdsRef.current.add(studentId)
-
-      const attendance = result.attendance ?? result.data
-      const subjects = result.autoMarkedSubjects ?? result.newlyMarkedSubjects ?? []
       const enrolledSubjects =
         result.enrolledSubjects ?? result.enrolled_subjects ?? []
-      const autoMarkedDetails = (result.autoMarkedDetails ?? []).map(
-        (item) => item.label || `${item.subjectName ?? item.subject_name} - Present`,
+      const newlyMarked = result.newlyMarkedSubjects ?? []
+      const alreadyMarked = result.alreadyMarkedSubjects ?? []
+      const presentNowDetails = (result.presentNowDetails ?? []).map(
+        (item) => item.label || `${item.subjectName ?? item.subject_name}`,
       )
-      const status =
-        subjects.length > 0
-          ? `Present · ${subjects.join(", ")}`
-          : attendance?.status || result.status || "Present"
-      const alreadyToday =
-        /already marked/i.test(result.message || "") &&
-        !(result.newlyMarkedSubjects && result.newlyMarkedSubjects.length > 0)
+      const alreadyMarkedDetails = (result.alreadyMarkedDetails ?? []).map(
+        (item) =>
+          item.label ||
+          `Already marked for ${item.subjectName ?? item.subject_name}.`,
+      )
+
+      // Fallback labels when older API shape is returned.
+      const fallbackPresent =
+        presentNowDetails.length > 0
+          ? presentNowDetails
+          : newlyMarked.map((subject) => `${subject} - Present`)
+      const fallbackAlready =
+        alreadyMarkedDetails.length > 0
+          ? alreadyMarkedDetails
+          : alreadyMarked.map((subject) => `Already marked for ${subject}.`)
 
       const displayName = result.studentName || name
       const displayReg = result.registrationNo || registrationNo
 
-      if (!alreadyToday) {
-        playSuccessChime()
-        setRecognized({
-          studentId,
-          name: displayName,
-          registrationNo: displayReg,
-          status,
-          distance,
-          enrolledSubjects,
-          autoMarkedDetails:
-            autoMarkedDetails.length > 0
-              ? autoMarkedDetails
-              : subjects.map((subject) => `${subject} - Present`),
-        })
-        if (subjects.length > 0) {
-          toast.success(`Auto-marked: ${subjects.join(", ")}`)
-        }
-        setLog((prev) => {
-          if (prev.some((entry) => entry.studentId === studentId)) {
-            return prev
-          }
-          return [
-            {
-              id: String(studentId),
-              studentId,
-              name: displayName,
-              registrationNo: displayReg,
-              status,
-              timeLabel: formatClock(new Date()),
-              distance,
-              enrolledSubjects,
-              autoMarkedDetails:
-                autoMarkedDetails.length > 0
-                  ? autoMarkedDetails
-                  : subjects.map((subject) => `${subject} - Present`),
-            },
-            ...prev,
-          ].slice(0, 40)
-        })
-      } else {
-        // Backend says already marked today — track in session, skip list duplicate.
-        setRecognized({
-          studentId,
-          name: displayName,
-          registrationNo: displayReg,
-          status:
-            subjects.length > 0
-              ? `Already Marked · ${subjects.join(", ")}`
-              : "Already Marked Today",
-          distance,
-          enrolledSubjects,
-          autoMarkedDetails:
-            autoMarkedDetails.length > 0
-              ? autoMarkedDetails
-              : subjects.map((subject) => `${subject} - Present`),
-        })
+      let mode: RecognizedStudent["mode"] = "present"
+      let statusLabel = "Present"
+      if (result.status === "NoClass") {
+        mode = "noclass"
+        statusLabel = "No class now"
+      } else if (result.status === "AlreadyMarked" || (newlyMarked.length === 0 && alreadyMarked.length > 0)) {
+        mode = "already"
+        statusLabel =
+          alreadyMarked.length === 1
+            ? `Already marked for ${alreadyMarked[0]}`
+            : "Already marked for current class"
+      } else if (newlyMarked.length > 0 && alreadyMarked.length > 0) {
+        mode = "mixed"
+        statusLabel = `Present · ${newlyMarked.join(", ")}`
+      } else if (newlyMarked.length > 0) {
+        mode = "present"
+        statusLabel = `Present · ${newlyMarked.join(", ")}`
       }
+
+      setRecognized({
+        studentId,
+        name: displayName,
+        registrationNo: displayReg,
+        mode,
+        status: statusLabel,
+        distance,
+        enrolledSubjects,
+        presentNowDetails: fallbackPresent,
+        alreadyMarkedDetails: fallbackAlready,
+      })
+
+      if (mode === "noclass") {
+        toast.message(
+          `${displayName}: no timetable class at this time. Enrolled subjects shown only.`,
+        )
+        return
+      }
+
+      if (mode === "already") {
+        toast.message(
+          fallbackAlready[0] ||
+            `Already marked for ${alreadyMarked.join(", ") || "current class"}.`,
+        )
+        return
+      }
+
+      playSuccessChime()
+      if (newlyMarked.length > 0) {
+        toast.success(`Marked: ${newlyMarked.join(", ")}`)
+      }
+      if (alreadyMarked.length > 0) {
+        toast.message(fallbackAlready.join(" "))
+      }
+
+      setLog((prev) => [
+        {
+          id: `${studentId}-${Date.now()}`,
+          studentId,
+          name: displayName,
+          registrationNo: displayReg,
+          status: statusLabel,
+          timeLabel: formatClock(new Date()),
+          distance,
+          enrolledSubjects,
+          presentNowDetails: fallbackPresent,
+          alreadyMarkedDetails: fallbackAlready,
+        },
+        ...prev,
+      ].slice(0, 40))
     } catch (error) {
       if (isAlreadyScannedError(error)) {
-        markedStudentIdsRef.current.add(studentId)
+        const message = getApiErrorMessage(error, "Already marked for current class.")
         setRecognized({
           studentId,
           name,
           registrationNo,
-          status: "Already Marked Today",
+          mode: "already",
+          status: message.replace(/\.$/, ""),
           distance,
           enrolledSubjects: [],
-          autoMarkedDetails: [],
+          presentNowDetails: [],
+          alreadyMarkedDetails: [message.endsWith(".") ? message : `${message}.`],
         })
+        toast.message(message)
       } else {
         recentDetectionsRef.current.delete(studentId)
         toast.error(getApiErrorMessage(error, `Failed to mark ${name}`))
@@ -465,14 +480,12 @@ export function KioskAttendanceScreen({
         for (const detection of detections) {
           const match = matchWithFaceMatcher(matcher, detection.descriptor, profilesByIdRef.current)
           if (match) {
-            const alreadyMarked = markedStudentIdsRef.current.has(match.studentId)
             overlays.push({
               box: detection.box,
-              label: alreadyMarked ? "Already Marked Today" : match.label,
-              matched: !alreadyMarked,
-              alreadyMarked,
+              label: match.label,
+              matched: true,
             })
-            if (!alreadyMarked && (!bestMatch || match.distance < bestMatch.distance)) {
+            if (!bestMatch || match.distance < bestMatch.distance) {
               bestMatch = match
             }
           } else {
@@ -487,10 +500,6 @@ export function KioskAttendanceScreen({
         drawFaceOverlays(canvas, video, overlays)
 
         if (!bestMatch || markingRef.current) {
-          return
-        }
-
-        if (markedStudentIdsRef.current.has(bestMatch.studentId)) {
           return
         }
 
@@ -641,36 +650,57 @@ export function KioskAttendanceScreen({
         {/* Recognition feedback card */}
         {recognized && (
           <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
-            <div className="flex w-full max-w-lg flex-col gap-3 rounded-2xl border border-emerald-400/40 bg-emerald-950/90 px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300">
+            <div
+              className={`flex w-full max-w-lg flex-col gap-3 rounded-2xl border px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300 ${
+                recognized.mode === "already"
+                  ? "border-amber-400/40 bg-amber-950/90"
+                  : recognized.mode === "noclass"
+                    ? "border-white/20 bg-zinc-900/90"
+                    : "border-emerald-400/40 bg-emerald-950/90"
+              }`}
+            >
               <div className="flex items-center gap-4">
-                <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-xl font-bold text-emerald-950">
+                <div
+                  className={`flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-bold ${
+                    recognized.mode === "already"
+                      ? "bg-amber-400 text-amber-950"
+                      : "bg-emerald-400 text-emerald-950"
+                  }`}
+                >
                   {initials(recognized.name)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-lg font-semibold text-white">
                     {recognized.name}
                   </p>
-                  <p className="truncate text-sm text-emerald-200/80">
+                  <p className="truncate text-sm text-white/70">
                     ID: {recognized.registrationNo}
                   </p>
                 </div>
-                <Badge className="shrink-0 gap-1 border-0 bg-emerald-400 text-emerald-950">
-                  <CheckCircle2 className="size-3.5" />
+                <Badge
+                  className={`shrink-0 gap-1 border-0 ${
+                    recognized.mode === "already"
+                      ? "bg-amber-400 text-amber-950"
+                      : "bg-emerald-400 text-emerald-950"
+                  }`}
+                >
+                  {recognized.mode === "already" ? (
+                    <AlertTriangle className="size-3.5" />
+                  ) : (
+                    <CheckCircle2 className="size-3.5" />
+                  )}
                   {recognized.status}
                 </Badge>
               </div>
 
               {recognized.enrolledSubjects.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium tracking-wide text-emerald-200/70 uppercase">
+                  <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
                     Enrolled Subjects
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {recognized.enrolledSubjects.map((subject) => (
-                      <Badge
-                        key={subject}
-                        className="border-0 bg-sky-400/20 text-sky-100"
-                      >
+                      <Badge key={subject} className="border-0 bg-sky-400/20 text-sky-100">
                         {subject}
                       </Badge>
                     ))}
@@ -678,15 +708,31 @@ export function KioskAttendanceScreen({
                 </div>
               )}
 
-              {recognized.autoMarkedDetails.length > 0 && (
+              {recognized.presentNowDetails.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium tracking-wide text-emerald-200/70 uppercase">
-                    Auto-Marked Subjects Today
+                  <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
+                    Marked Today / Present Now
                   </p>
-                  <ul className="space-y-1 text-sm text-emerald-50">
-                    {recognized.autoMarkedDetails.map((detail) => (
+                  <ul className="space-y-1 text-sm text-white">
+                    {recognized.presentNowDetails.map((detail) => (
                       <li key={detail} className="flex items-start gap-2">
                         <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
+                        <span>{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {recognized.alreadyMarkedDetails.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium tracking-wide text-amber-200/80 uppercase">
+                    Already Marked Warning
+                  </p>
+                  <ul className="space-y-1 text-sm text-amber-50">
+                    {recognized.alreadyMarkedDetails.map((detail) => (
+                      <li key={detail} className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-300" />
                         <span>{detail}</span>
                       </li>
                     ))}
@@ -738,7 +784,7 @@ export function KioskAttendanceScreen({
         <div className="border-b px-4 py-3">
           <h3 className="font-semibold">Recent attendance</h3>
           <p className="text-muted-foreground text-xs">
-            Unique students this session · {log.length} marked
+            Recent scans this session · {log.length} events
           </p>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -767,17 +813,19 @@ export function KioskAttendanceScreen({
                         ))}
                       </div>
                     )}
-                    {entry.autoMarkedDetails.length > 0 && (
-                      <p className="text-muted-foreground text-[11px]">
-                        {entry.autoMarkedDetails.join(" · ")}
+                    {entry.presentNowDetails.length > 0 && (
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                        {entry.presentNowDetails.join(" · ")}
+                      </p>
+                    )}
+                    {entry.alreadyMarkedDetails.length > 0 && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        {entry.alreadyMarkedDetails.join(" · ")}
                       </p>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <Badge
-                      variant={entry.status === "Already marked" ? "secondary" : "default"}
-                      className="text-[10px]"
-                    >
+                    <Badge variant="secondary" className="text-[10px]">
                       {entry.status}
                     </Badge>
                     <p className="text-muted-foreground mt-1 font-mono text-[10px]">
