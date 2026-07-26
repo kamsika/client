@@ -87,6 +87,28 @@ export async function listStudents(searchOrOptions?: string | { search?: string;
   return data.students
 }
 
+export async function getStudent(studentId: number) {
+  const { data } = await apiClient.get<{ student: Student }>(`/api/students/${studentId}`)
+  return data.student
+}
+
+/** Resolve a scanned QR registration / student id to full student details. */
+export async function lookupStudentByScannedId(scannedStudentId: string) {
+  const scanned = scannedStudentId.trim()
+  if (!scanned) {
+    throw new Error("Invalid QR code")
+  }
+  const { data } = await apiClient.get<{
+    success?: boolean
+    student: Student
+    scanned_id?: string
+    scannedId?: string
+  }>("/api/students/lookup", {
+    params: { student_id: scanned },
+  })
+  return data.student
+}
+
 export async function listStudentGrades() {
   const { data } = await apiClient.get<{ grades?: string[] }>("/api/students")
   return data.grades ?? []

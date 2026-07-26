@@ -54,6 +54,11 @@ export interface Subject {
 export interface Student {
   id: number
   institution_id: number
+  institutionId?: number
+  institution_name?: string | null
+  institutionName?: string | null
+  tuition_center_name?: string | null
+  tuitionCenterName?: string | null
   user_id: number
   parent_id: number
   registration_no: string
@@ -66,13 +71,35 @@ export interface Student {
   parent_name: string | null
   parent_phone: string | null
   has_face_descriptor?: boolean
+  profile_photo?: string | null
+  profilePhoto?: string | null
+  photo_url?: string | null
+  photoUrl?: string | null
   enrolled_subjects?: string[]
   enrolledSubjects?: string[]
+  registered_subjects?: Array<{
+    id?: number | null
+    name: string
+    code?: string | null
+    teacher_id?: number | null
+    teacherId?: number | null
+    teacher_name?: string | null
+    teacherName?: string | null
+  }>
+  registeredSubjects?: Array<{
+    id?: number | null
+    name: string
+    code?: string | null
+    teacher_id?: number | null
+    teacherId?: number | null
+    teacher_name?: string | null
+    teacherName?: string | null
+  }>
   classroom_id?: number | null
   classroomId?: number | null
   classroom_name?: string | null
   classroomName?: string | null
-  classroom?: { id: number; name: string } | null
+  classroom?: { id: number; name: string; grade?: string | null } | null
 }
 
 export interface Attendance {

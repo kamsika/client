@@ -60,7 +60,8 @@ export default function TeacherQrScannerPage() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-[#05082E]">QR Scanner</h2>
         <p className="text-sm text-[#0047AB]/75">
-          Select a classroom/grade, then scan student QR codes to mark attendance for today.
+          Select a classroom/grade, scan a student QR, review their details and enrolled
+          subjects, then mark attendance as Present.
         </p>
       </div>
 
