@@ -3,6 +3,8 @@
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
+const THEME_STORAGE_KEY = "theme"
+
 function ThemeProvider({
   children,
   ...props
@@ -13,7 +15,12 @@ function ThemeProvider({
       defaultTheme="system"
       enableSystem
       disableTransitionOnChange
+      storageKey={THEME_STORAGE_KEY}
       {...props}
+      // Prevent next-themes from rendering an executable <script> inside a
+      // React client component (React 19 / Next.js warning). FOUC prevention
+      // is handled by the inline script in app/layout.tsx instead.
+      scriptProps={{ type: "application/json" }}
     >
       <ThemeHotkey />
       {children}
@@ -68,4 +75,4 @@ function ThemeHotkey() {
   return null
 }
 
-export { ThemeProvider }
+export { ThemeProvider, THEME_STORAGE_KEY }
