@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import type { LucideIcon } from "lucide-react"
 import { LogOut, Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -11,14 +12,34 @@ import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
 import { fetchCurrentUser, logout } from "@/services/auth"
 import type { User } from "@/types"
 
-interface DashboardShellProps {
-  children: React.ReactNode
-  navItems: { href: string; label: string }[]
-  title: string
-  allowedRoles: string[]
+export type DashboardNavItem = {
+  href: string
+  label: string
+  exact?: boolean
+  icon?: LucideIcon
 }
 
-export function DashboardShell({ children, navItems, title, allowedRoles }: DashboardShellProps) {
+interface DashboardShellProps {
+  children: React.ReactNode
+  navItems: DashboardNavItem[]
+  title: string
+  allowedRoles: string[]
+  /** Optional feature tabs rendered in the sticky header (replaces default nav row styling). */
+  featureNav?: React.ReactNode
+}
+
+function isNavActive(pathname: string, item: DashboardNavItem) {
+  if (item.exact) return pathname === item.href
+  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+}
+
+export function DashboardShell({
+  children,
+  navItems,
+  title,
+  allowedRoles,
+  featureNav,
+}: DashboardShellProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
@@ -68,7 +89,7 @@ export function DashboardShell({ children, navItems, title, allowedRoles }: Dash
 
   return (
     <div className="bg-background min-h-screen">
-      <header className="border-b">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
           <div>
             <h1 className="text-lg font-semibold">{title}</h1>
@@ -91,18 +112,40 @@ export function DashboardShell({ children, navItems, title, allowedRoles }: Dash
             </Button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 pb-3">
-          {navItems.map((item) => (
-            <Link key={item.href} href={item.href}>
-              <Button
-                variant={pathname === item.href || pathname.startsWith(item.href + "/") ? "default" : "ghost"}
-                size="sm"
-              >
-                {item.label}
-              </Button>
-            </Link>
-          ))}
-        </nav>
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 pb-3">
+          {featureNav ? (
+            <>
+              {featureNav}
+              <div className="ml-auto flex shrink-0 gap-1">
+                {navItems.map((item) => {
+                  const active = isNavActive(pathname, item)
+                  return (
+                    <Link key={item.href} href={item.href}>
+                      <Button variant={active ? "default" : "ghost"} size="sm">
+                        {item.label}
+                      </Button>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <nav className="flex gap-1 overflow-x-auto">
+              {navItems.map((item) => {
+                const Icon = item.icon
+                const active = isNavActive(pathname, item)
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <Button variant={active ? "default" : "ghost"} size="sm">
+                      {Icon ? <Icon className="size-4" aria-hidden /> : null}
+                      {item.label}
+                    </Button>
+                  </Link>
+                )
+              })}
+            </nav>
+          )}
+        </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
     </div>

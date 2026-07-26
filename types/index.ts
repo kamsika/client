@@ -56,6 +56,8 @@ export interface Attendance {
   status: "Present" | "Absent" | "Late"
   subject_name?: string | null
   subjectName?: string | null
+  marked_via?: string | null
+  markedVia?: string | null
   marked_by: number | null
   student_name: string | null
   registration_no: string | null

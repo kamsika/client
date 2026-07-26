@@ -7,13 +7,12 @@ import { toast } from "sonner"
 import { AttendanceDatePicker } from "@/components/attendance-date-picker"
 import { AttendanceSummaryStats } from "@/components/attendance-summary-stats"
 import { AttendanceToggle } from "@/components/attendance-toggle"
-import { DashboardShell } from "@/components/dashboard-shell"
 import { StudentAttendanceHistoryDialog } from "@/components/student-attendance-history-dialog"
+import { TeacherShell } from "@/components/teacher-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { downloadBlob } from "@/lib/download"
 import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
-import { getTeacherNav } from "@/lib/teacher-nav"
 import { exportAttendancePdf, getClassroomAttendance, markAttendance } from "@/services/attendance"
 import type { AttendanceRecord, AttendanceSummary, Classroom } from "@/types"
 
@@ -113,7 +112,7 @@ export default function ClassroomAttendancePage() {
   }
 
   return (
-    <DashboardShell title="Live Attendance" navItems={getTeacherNav()} allowedRoles={["teacher"]}>
+    <TeacherShell title="Live Attendance">
       <div className="grid gap-6">
         <Card>
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -177,6 +176,6 @@ export default function ClassroomAttendancePage() {
           }}
         />
       </div>
-    </DashboardShell>
+    </TeacherShell>
   )
 }

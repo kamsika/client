@@ -113,6 +113,58 @@ export async function getClassroomAttendance(classroomId: number, date?: string)
   return data
 }
 
+export interface ManualAttendanceStudentRow {
+  studentId: number
+  fullName: string | null
+  registrationNo: string
+  status: "Present" | "Absent" | "Late" | null
+  statusIndicator: string
+  markedVia: string | null
+  arrivalTime: string | null
+  attendance: Attendance | null
+}
+
+export interface ManualAttendanceRoster {
+  classroom: { id: number; name: string }
+  subjectName: string | null
+  date: string
+  subjects: string[]
+  students: ManualAttendanceStudentRow[]
+  count: number
+}
+
+export async function getManualAttendanceRoster(params: {
+  classroomId: number
+  subjectName?: string
+  date?: string
+}) {
+  const { data } = await apiClient.get<ManualAttendanceRoster>("/api/attendance/manual", {
+    params: {
+      classroomId: params.classroomId,
+      subjectName: params.subjectName,
+      date: params.date,
+    },
+  })
+  return data
+}
+
+export async function saveManualAttendance(payload: {
+  classroomId: number
+  subjectName: string
+  date: string
+  markingTime?: string
+  students: Array<{ studentId: number; status: "Present" | "Absent" | "Late" }>
+}) {
+  const { data } = await apiClient.post<{
+    success: true
+    message: string
+    count: number
+    records: Attendance[]
+    markedVia: "manual"
+  }>("/api/attendance/manual", payload)
+  return data
+}
+
 export async function getStudentAttendance(
   studentId: number,
   params?: {

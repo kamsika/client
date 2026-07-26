@@ -65,6 +65,19 @@ export function localTodayISO(): string {
   }).format(new Date())
 }
 
+/** Current local wall-clock time as HH:MM in the app timezone. */
+export function localNowTimeHHMM(): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_DISPLAY_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date())
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00"
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00"
+  return `${hour}:${minute}`
+}
+
 export function formatAttendanceDayLabel(dateISO: string): string {
   if (!dateISO) return ""
   if (dateISO === localTodayISO()) return `Today · ${dateISO}`

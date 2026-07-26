@@ -210,7 +210,7 @@ export function TeacherAttendanceDashboard({
               )}
               Refresh
             </Button>
-            <Link href="/teacher/attendance/kiosk">
+            <Link href="/teacher/dashboard/kiosk">
               <Button
                 type="button"
                 size="lg"
