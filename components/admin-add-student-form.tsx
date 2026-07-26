@@ -6,7 +6,6 @@ import { toast } from "sonner"
 import { EnrolledSubjectsPicker } from "@/components/enrolled-subjects-picker"
 import { StudentQrCode } from "@/components/student-qr-code"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -19,8 +18,21 @@ import {
 import { downloadStudentQrCanvas, printStudentQrCanvas } from "@/lib/download-qr-image"
 import { findDuplicateStudent, getNextStudentId } from "@/lib/generate-student-id"
 import { getApiErrorMessage } from "@/lib/api-errors"
+import { cn } from "@/lib/utils"
 import { createStudent } from "@/services/student"
 import type { Student } from "@/types"
+
+const fieldClass =
+  "h-11 border-[#A2D4ED] bg-white text-[#05082E] transition focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40"
+
+const primaryBtn =
+  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
+
+const outlineBtn =
+  "border-[#A2D4ED] text-[#0047AB] transition hover:bg-[#ABD2F2]/40"
+
+const cardShell =
+  "overflow-hidden rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)]"
 
 interface AdminAddStudentFormProps {
   existingStudents: Student[]
@@ -137,46 +149,52 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
     const studentId = savedStudent.registration_no
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Student Added Successfully</CardTitle>
-          <CardDescription>
+      <div className={cardShell}>
+        <div className="border-b border-[#A2D4ED]/40 px-5 py-4">
+          <h2 className="text-base font-semibold text-[#05082E]">Student Added Successfully</h2>
+          <p className="text-sm text-[#0047AB]/75">
             {savedStudent.full_name} · ID: {studentId}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="rounded-lg border bg-green-50 p-4 text-sm text-green-800 dark:bg-green-950/30 dark:text-green-300">
-            Student saved with ID <span className="font-mono font-semibold">{studentId}</span>. QR code
-            is ready below.
+          </p>
+        </div>
+        <div className="space-y-6 p-5">
+          <div className="rounded-xl border border-[#A2D4ED]/50 bg-[#ABD2F2]/25 p-4 text-sm text-[#0047AB]">
+            Student saved with ID <span className="font-mono font-semibold text-[#05082E]">{studentId}</span>.
+            QR code is ready below.
           </div>
 
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
-              <span className="text-muted-foreground">Name:</span> {savedStudent.full_name}
+              <span className="text-[#0047AB]/70">Name:</span>{" "}
+              <span className="text-[#05082E]">{savedStudent.full_name}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Grade:</span> {savedStudent.grade}
+              <span className="text-[#0047AB]/70">Grade:</span>{" "}
+              <span className="text-[#05082E]">{savedStudent.grade}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Section:</span> {savedStudent.section}
+              <span className="text-[#0047AB]/70">Section:</span>{" "}
+              <span className="text-[#05082E]">{savedStudent.section}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Gender:</span> {savedStudent.gender}
+              <span className="text-[#0047AB]/70">Gender:</span>{" "}
+              <span className="text-[#05082E]">{savedStudent.gender}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Contact:</span>{" "}
-              {savedStudent.contact || form.contact}
+              <span className="text-[#0047AB]/70">Contact:</span>{" "}
+              <span className="text-[#05082E]">{savedStudent.contact || form.contact}</span>
             </div>
             <div className="sm:col-span-2">
-              <span className="text-muted-foreground">Enrolled subjects:</span>{" "}
-              {(savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).length > 0
-                ? (savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).join(", ")
-                : "None"}
+              <span className="text-[#0047AB]/70">Enrolled subjects:</span>{" "}
+              <span className="text-[#05082E]">
+                {(savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).length > 0
+                  ? (savedStudent.enrolledSubjects ?? savedStudent.enrolled_subjects ?? []).join(", ")
+                  : "None"}
+              </span>
             </div>
           </dl>
 
-          <div className="flex flex-col items-center gap-3 rounded-lg border bg-white p-5 text-black">
-            <p className="text-sm font-medium">Generated QR Code</p>
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#A2D4ED]/50 bg-[#f8fbfe] p-5">
+            <p className="text-sm font-medium text-[#05082E]">Generated QR Code</p>
             <StudentQrCode
               key={`created-qr-${savedStudent.id}-${studentId}`}
               ref={qrCanvasRef}
@@ -185,45 +203,47 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
               label={`${savedStudent.full_name || "Student"} (${studentId})`}
             />
             <div className="flex w-full max-w-[280px] flex-col gap-2">
-              <Button variant="outline" className="w-full text-black" onClick={handleDownloadQrCode}>
+              <Button variant="outline" className={cn("w-full", outlineBtn)} onClick={handleDownloadQrCode}>
                 Download QR Code
               </Button>
-              <Button variant="secondary" className="w-full" onClick={handlePrintQrCode}>
+              <Button className={cn("w-full", primaryBtn)} onClick={handlePrintQrCode}>
                 Print QR Code
               </Button>
             </div>
           </div>
 
-          <Button variant="secondary" onClick={handleAddAnother}>
+          <Button variant="outline" className={outlineBtn} onClick={handleAddAnother}>
             Add Another Student
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add Student</CardTitle>
-        <CardDescription>
+    <div className={cardShell}>
+      <div className="border-b border-[#A2D4ED]/40 px-5 py-4">
+        <h2 className="text-base font-semibold text-[#05082E]">Add Student</h2>
+        <p className="text-sm text-[#0047AB]/75">
           Register a new student. The next ID will be assigned automatically (preview:{" "}
-          <span className="font-mono">{previewStudentId}</span>).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+          <span className="font-mono font-medium text-[#05082E]">{previewStudentId}</span>).
+        </p>
+      </div>
+      <div className="p-5">
         {duplicateMessage && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {duplicateMessage}
           </div>
         )}
 
         <form onSubmit={(event) => void handleSubmit(event)} className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="student-name">Name</Label>
+            <Label htmlFor="student-name" className="text-[#05082E]">
+              Name
+            </Label>
             <Input
               id="student-name"
-              className="text-black"
+              className={fieldClass}
               placeholder="Enter full name"
               value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
@@ -231,10 +251,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="student-grade">Grade</Label>
+            <Label htmlFor="student-grade" className="text-[#05082E]">
+              Grade
+            </Label>
             <Input
               id="student-grade"
-              className="text-black"
+              className={fieldClass}
               placeholder="e.g. 10"
               value={form.grade}
               onChange={(event) => setForm({ ...form, grade: event.target.value })}
@@ -242,10 +264,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="student-section">Section</Label>
+            <Label htmlFor="student-section" className="text-[#05082E]">
+              Section
+            </Label>
             <Input
               id="student-section"
-              className="text-black"
+              className={fieldClass}
               placeholder="e.g. A"
               value={form.section}
               onChange={(event) => setForm({ ...form, section: event.target.value })}
@@ -253,12 +277,14 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="student-gender">Gender</Label>
+            <Label htmlFor="student-gender" className="text-[#05082E]">
+              Gender
+            </Label>
             <Select
               value={form.gender || undefined}
               onValueChange={(value) => value && setForm({ ...form, gender: value as GenderOption })}
             >
-              <SelectTrigger id="student-gender" className="text-black">
+              <SelectTrigger id="student-gender" className={cn(fieldClass, "w-full")}>
                 <SelectValue placeholder="Select gender" />
               </SelectTrigger>
               <SelectContent>
@@ -270,10 +296,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="student-contact">Contact Number</Label>
+            <Label htmlFor="student-contact" className="text-[#05082E]">
+              Contact Number
+            </Label>
             <Input
               id="student-contact"
-              className="text-black"
+              className={fieldClass}
               placeholder="e.g. +94771234567"
               value={form.contact}
               onChange={(event) => setForm({ ...form, contact: event.target.value })}
@@ -288,12 +316,12 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
           </div>
 
           <div className="sm:col-span-2">
-            <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
+            <Button type="submit" className={cn("h-11 w-full sm:w-auto", primaryBtn)} disabled={submitting}>
               {submitting ? "Saving..." : "Add Student"}
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

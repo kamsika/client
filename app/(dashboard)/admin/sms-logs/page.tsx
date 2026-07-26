@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 
-import { DashboardShell } from "@/components/dashboard-shell"
+import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { LogsTable, StatusBadge } from "@/components/logs-table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getAdminNav } from "@/lib/admin-nav"
@@ -46,7 +46,7 @@ export default function SmsLogsPage() {
   const failedCount = smsLogs.filter((log) => log.status === "Failed").length
 
   return (
-    <DashboardShell title="SMS Logs" navItems={getAdminNav(false)} allowedRoles={["institution_admin"]}>
+    <InstitutionAdminShell title="SMS Logs" navItems={getAdminNav(false)} allowedRoles={["institution_admin"]}>
       <div className="grid gap-6">
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -83,6 +83,6 @@ export default function SmsLogsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </InstitutionAdminShell>
   )
 }

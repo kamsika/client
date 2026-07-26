@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import { AttendanceDatePicker } from "@/components/attendance-date-picker"
 import { AttendanceDayPanel } from "@/components/attendance-day-panel"
 import { AttendanceReportsPanel } from "@/components/attendance-reports-panel"
-import { DashboardShell } from "@/components/dashboard-shell"
+import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
@@ -47,7 +47,7 @@ export default function AdminAttendancePage() {
   }, [])
 
   return (
-    <DashboardShell
+    <InstitutionAdminShell
       title="Attendance"
       navItems={navItems}
       allowedRoles={["institution_admin"]}
@@ -134,6 +134,6 @@ export default function AdminAttendancePage() {
           <AttendanceReportsPanel />
         </TabsContent>
       </Tabs>
-    </DashboardShell>
+    </InstitutionAdminShell>
   )
 }

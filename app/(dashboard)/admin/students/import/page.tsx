@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import { Download, Upload } from "lucide-react"
 import { toast } from "sonner"
 
-import { DashboardShell } from "@/components/dashboard-shell"
+import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { downloadBlob } from "@/lib/download"
@@ -39,7 +39,7 @@ export default function ImportStudentsPage() {
   }
 
   return (
-    <DashboardShell title="Import Students" navItems={getAdminNav(false)} allowedRoles={["institution_admin"]}>
+    <InstitutionAdminShell title="Import Students" navItems={getAdminNav(false)} allowedRoles={["institution_admin"]}>
       <div className="grid gap-6">
         <Card>
           <CardHeader>
@@ -98,6 +98,6 @@ export default function ImportStudentsPage() {
           </Card>
         )}
       </div>
-    </DashboardShell>
+    </InstitutionAdminShell>
   )
 }

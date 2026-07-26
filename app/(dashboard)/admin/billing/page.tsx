@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import { toast } from "sonner"
 
-import { DashboardShell } from "@/components/dashboard-shell"
+import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { LogsTable } from "@/components/logs-table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -82,7 +82,7 @@ export default function AdminBillingPage() {
   const current = billing[0]
 
   return (
-    <DashboardShell title="Billing" navItems={getAdminNav(isSuperAdmin)} allowedRoles={["institution_admin", "super_admin"]}>
+    <InstitutionAdminShell title="Billing" navItems={getAdminNav(isSuperAdmin)} allowedRoles={["institution_admin", "super_admin"]}>
       <div className="grid gap-6">
         {isSuperAdmin && institutions.length > 0 && (
           <Select
@@ -141,6 +141,6 @@ export default function AdminBillingPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardShell>
+    </InstitutionAdminShell>
   )
 }
