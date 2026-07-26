@@ -6,6 +6,29 @@ import type {
   StudentAttendanceHistoryResponse,
 } from "@/types"
 
+export type SelectableAttendanceSubject = {
+  id?: number
+  subjectId?: number
+  subject_id?: number
+  subjectName?: string
+  subject_name?: string
+  startTime?: string
+  start_time?: string
+  endTime?: string
+  end_time?: string
+  timeRange?: string
+  time_range?: string
+  isCurrent?: boolean
+  is_current?: boolean
+  continuous?: boolean
+  selectable?: boolean
+  canMark?: boolean
+  can_mark?: boolean
+  defaultChecked?: boolean
+  default_checked?: boolean
+  label?: string
+}
+
 export type AttendanceScanResponse = {
   success?: boolean
   status?: string
@@ -13,9 +36,24 @@ export type AttendanceScanResponse = {
   studentId?: number
   studentName?: string | null
   registrationNo?: string
+  grade?: string | null
+  section?: string | null
+  classroomId?: number
+  classroomName?: string | null
+  classroom_name?: string | null
   enrolledSubjects?: string[]
   enrolled_subjects?: string[]
+  requiresSelection?: boolean
+  requires_selection?: boolean
+  continuousGroup?: boolean
+  continuous_group?: boolean
+  selectableSubjects?: SelectableAttendanceSubject[]
+  selectable_subjects?: SelectableAttendanceSubject[]
+  /** Gap/interval classes (>15 min) — display only, not markable. */
+  scheduledSubjects?: SelectableAttendanceSubject[]
+  scheduled_subjects?: SelectableAttendanceSubject[]
   todayTimetable?: Array<{
+    id?: number
     subjectName?: string
     subject_name?: string
     startTime?: string
@@ -77,15 +115,20 @@ export async function markAttendanceByScan(
 export async function scanCenterAttendance(payload: {
   scannedStudentId: string
   classroomId?: number
+  selectedSubjectIds?: number[]
 }) {
   console.log("Sending student ID to API:", payload.scannedStudentId)
-  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", {
+  const body: Record<string, unknown> = {
     student_id: payload.scannedStudentId,
     classroom_id: payload.classroomId,
     status: "Present",
     scanned_at: new Date().toISOString(),
     prevent_duplicate: true,
-  })
+  }
+  if (payload.selectedSubjectIds !== undefined) {
+    body.selectedSubjectIds = payload.selectedSubjectIds
+  }
+  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", body)
   return data
 }
 
@@ -126,16 +169,19 @@ export async function markKioskAttendance(payload: {
   studentId: number
   classroomId: number
   timestamp?: string
+  selectedSubjectIds?: number[]
 }) {
-  const { data } = await apiClient.post<AttendanceScanResponse>(
-    "/api/attendance",
-    {
-      studentId: payload.studentId,
-      classroomId: payload.classroomId,
-      status: "Present",
-      timestamp: payload.timestamp ?? new Date().toISOString(),
-    },
-  )
+  const body: Record<string, unknown> = {
+    studentId: payload.studentId,
+    classroomId: payload.classroomId,
+    status: "Present",
+    timestamp: payload.timestamp ?? new Date().toISOString(),
+    markedVia: "face",
+  }
+  if (payload.selectedSubjectIds !== undefined) {
+    body.selectedSubjectIds = payload.selectedSubjectIds
+  }
+  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance", body)
   return data
 }
 

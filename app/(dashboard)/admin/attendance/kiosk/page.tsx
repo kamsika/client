@@ -1,17 +1,6 @@
-"use client"
+import { redirect } from "next/navigation"
 
-import { DashboardShell } from "@/components/dashboard-shell"
-import { KioskAttendanceScreen } from "@/components/kiosk-attendance-screen"
-import { getAdminNav } from "@/lib/admin-nav"
-
+/** Face kiosk marking is teacher-only. */
 export default function AdminKioskAttendancePage() {
-  return (
-    <DashboardShell
-      title="Face Kiosk"
-      navItems={getAdminNav(false)}
-      allowedRoles={["institution_admin"]}
-    >
-      <KioskAttendanceScreen />
-    </DashboardShell>
-  )
+  redirect("/admin/dashboard")
 }

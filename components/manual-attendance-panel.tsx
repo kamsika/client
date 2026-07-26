@@ -379,7 +379,8 @@ export function ManualAttendancePanel() {
                     </TableRow>
                   )
                 })}
-              </TableBody>            </Table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>
