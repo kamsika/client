@@ -65,14 +65,31 @@ export async function updateStudentPaymentStatus(
   return data.payment
 }
 
-export async function listStudents(search?: string) {
-  const { data } = await apiClient.get<{ students: Student[]; count?: number; search?: string | null }>(
-    "/api/students",
-    {
-      params: search?.trim() ? { search: search.trim() } : undefined,
+export async function listStudents(searchOrOptions?: string | { search?: string; grade?: string }) {
+  const search =
+    typeof searchOrOptions === "string" ? searchOrOptions : searchOrOptions?.search
+  const grade = typeof searchOrOptions === "string" ? undefined : searchOrOptions?.grade
+
+  const { data } = await apiClient.get<{
+    students: Student[]
+    count?: number
+    search?: string | null
+    grade?: string | null
+    grades?: string[]
+  }>("/api/students", {
+    params: {
+      ...(search?.trim() ? { search: search.trim() } : {}),
+      ...(grade?.trim() && grade.trim().toLowerCase() !== "all"
+        ? { grade: grade.trim() }
+        : {}),
     },
-  )
+  })
   return data.students
+}
+
+export async function listStudentGrades() {
+  const { data } = await apiClient.get<{ grades?: string[] }>("/api/students")
+  return data.grades ?? []
 }
 
 export async function searchStudents(query: string) {
