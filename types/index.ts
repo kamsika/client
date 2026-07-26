@@ -21,9 +21,20 @@ export interface Classroom {
   id: number
   institution_id: number
   name: string
+  grade?: string | null
   schedule_start_time: string
   teacher_id: number
   teacher_name: string | null
+  subject_teachers?: ClassroomSubjectTeacher[]
+}
+
+export interface ClassroomSubjectTeacher {
+  subject: string
+  subjectName?: string
+  teacher_id: number
+  teacherId?: number
+  teacher_name?: string | null
+  teacherName?: string | null
 }
 
 export interface Student {
@@ -170,6 +181,10 @@ export interface TimetableSlot {
   classroomId: number | null
   student_id: number | null
   studentId: number | null
+  teacher_id?: number | null
+  teacherId?: number | null
+  teacher_name?: string | null
+  teacherName?: string | null
   day_of_week: string
   dayOfWeek: string
   subject_name: string

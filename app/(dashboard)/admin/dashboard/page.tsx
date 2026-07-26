@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   GraduationCap,
   LayoutGrid,
-  Loader2,
   MessageSquare,
-  Plus,
   School,
   Users,
 } from "lucide-react"
@@ -17,37 +15,14 @@ import { InstitutionAdminShell } from "@/components/institution-admin-shell"
 import { AdminAddStudentForm } from "@/components/admin-add-student-form"
 import { AdminStaffSection } from "@/components/admin-staff-section"
 import { AdminStudentsSection } from "@/components/admin-students-section"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { CreateClassroomDialog } from "@/components/create-classroom-dialog"
 import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
 import { cn } from "@/lib/utils"
-import { createClassroom, listClassrooms } from "@/services/classroom"
+import { listClassrooms } from "@/services/classroom"
 import { listSmsLogs } from "@/services/sms-log"
 import { listStudents, listTeachers } from "@/services/student"
 import type { Classroom, SmsLog, Student, User } from "@/types"
-
-const fieldClass =
-  "h-11 border-[#A2D4ED] bg-white transition focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40"
-
-const primaryBtn =
-  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
 
 const cardShell =
   "rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)]"
@@ -68,9 +43,6 @@ function InstitutionAdminDashboard() {
   const [loadingStudents, setLoadingStudents] = useState(true)
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
-  const [open, setOpen] = useState(false)
-  const [creatingClassroom, setCreatingClassroom] = useState(false)
-  const [form, setForm] = useState({ name: "", schedule_start_time: "09:00", teacher_id: "" })
 
   const loadData = useCallback(async () => {
     try {
@@ -101,33 +73,10 @@ function InstitutionAdminDashboard() {
       classrooms.slice(0, 5).map((cls) => ({
         id: String(cls.id),
         title: cls.name,
-        detail: `Starts at ${cls.schedule_start_time}${cls.teacher_name ? ` · ${cls.teacher_name}` : ""}`,
+        detail: `${cls.grade ? `${cls.grade} · ` : ""}${cls.teacher_name || "No teacher"}`,
       })),
     [classrooms],
   )
-
-  async function handleCreateClassroom() {
-    if (!form.name || !form.teacher_id) {
-      toast.error("Fill all classroom fields")
-      return
-    }
-    setCreatingClassroom(true)
-    try {
-      await createClassroom({
-        name: form.name,
-        schedule_start_time: form.schedule_start_time,
-        teacher_id: Number(form.teacher_id),
-      })
-      toast.success("Classroom created")
-      setOpen(false)
-      setForm({ name: "", schedule_start_time: "09:00", teacher_id: "" })
-      void loadData()
-    } catch {
-      toast.error("Failed to create classroom")
-    } finally {
-      setCreatingClassroom(false)
-    }
-  }
 
   return (
     <InstitutionAdminShell
@@ -203,73 +152,18 @@ function InstitutionAdminDashboard() {
           <div className="flex flex-col gap-4 border-b border-[#A2D4ED]/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-[#05082E]">Classrooms</h2>
-              <p className="text-sm text-[#0047AB]/75">Create and manage scheduled classes</p>
+              <p className="text-sm text-[#0047AB]/75">
+                Create grade classrooms with subject teachers and weekly timetables
+              </p>
             </div>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger render={<Button className={cn("h-10", primaryBtn)} />}>
-                <Plus className="size-4" />
-                Create Classroom
-              </DialogTrigger>
-              <DialogContent className="border-[#A2D4ED]/40 sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-[#05082E]">New Classroom</DialogTitle>
-                  <DialogDescription>
-                    Assign a teacher and schedule start time for this class.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-[#05082E]">Name</Label>
-                    <Input
-                      className={fieldClass}
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#05082E]">Schedule Start Time</Label>
-                    <Input
-                      className={fieldClass}
-                      type="time"
-                      value={form.schedule_start_time}
-                      onChange={(e) => setForm({ ...form, schedule_start_time: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[#05082E]">Teacher</Label>
-                    <Select
-                      value={form.teacher_id}
-                      onValueChange={(v) => v && setForm({ ...form, teacher_id: v })}
-                    >
-                      <SelectTrigger className={cn(fieldClass, "w-full")}>
-                        <SelectValue placeholder="Select teacher" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teachers.map((t) => (
-                          <SelectItem key={t.id} value={String(t.id)}>
-                            {t.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    className={cn("h-11 w-full", primaryBtn)}
-                    onClick={() => void handleCreateClassroom()}
-                    disabled={creatingClassroom}
-                  >
-                    {creatingClassroom ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Creating…
-                      </>
-                    ) : (
-                      "Create Classroom"
-                    )}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <CreateClassroomDialog
+              teachers={teachers}
+              onCreated={(classroom) => {
+                setClassrooms((current) =>
+                  [...current, classroom].sort((a, b) => a.name.localeCompare(b.name)),
+                )
+              }}
+            />
           </div>
 
           <div className="divide-y divide-[#A2D4ED]/30">
@@ -297,8 +191,11 @@ function InstitutionAdminDashboard() {
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-[#05082E]">{cls.name}</p>
                       <p className="text-sm text-[#0047AB]/75">
-                        Starts at {cls.schedule_start_time}
-                        {cls.teacher_name ? ` · ${cls.teacher_name}` : ""}
+                        {cls.grade ? `${cls.grade} · ` : ""}
+                        {cls.teacher_name || "No primary teacher"}
+                        {cls.subject_teachers?.length
+                          ? ` · ${cls.subject_teachers.length} subject${cls.subject_teachers.length === 1 ? "" : "s"}`
+                          : ""}
                       </p>
                     </div>
                   </div>

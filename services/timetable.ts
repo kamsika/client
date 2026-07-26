@@ -5,6 +5,7 @@ export interface UpsertTimetableInput {
   id?: number
   classroomId?: number
   studentId?: number
+  teacherId?: number
   dayOfWeek: string
   subjectName: string
   startTime: string
