@@ -171,17 +171,26 @@ export async function scanCenterAttendance(payload: {
 export async function getCenterAttendance(params?: {
   date?: string
   classroomId?: number
+  grade?: string
+  subject?: string
+  search?: string
 }) {
   const { data } = await apiClient.get<{
     date: string
     institution_id: number | null
     classroom_id: number | null
+    grade?: string | null
+    subject?: string | null
+    search?: string | null
     count: number
     records: Attendance[]
   }>("/api/attendance/today", {
     params: {
       date: params?.date,
       classroom_id: params?.classroomId,
+      grade: params?.grade,
+      subject: params?.subject,
+      search: params?.search,
     },
   })
   return data

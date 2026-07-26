@@ -214,6 +214,10 @@ export interface TeacherAttendanceStudentRow {
   classroomId: number | null
   classroomName: string | null
   attendanceId: number | null
+  subjectName?: string | null
+  subject_name?: string | null
+  subjectId?: number | null
+  subject_id?: number | null
   monthlyPayment?: {
     billing_period: string
     amount_due: number | null
@@ -223,17 +227,48 @@ export interface TeacherAttendanceStudentRow {
   monthlyPaymentStatus?: "Pending" | "Paid" | "Overdue"
 }
 
+export interface TeacherAttendanceHistoryRecord {
+  attendanceId: number | null
+  studentId: number
+  fullName: string | null
+  registrationNo: string
+  grade: string | null
+  subjectName: string | null
+  subject_name?: string | null
+  subjectId?: number | null
+  subject_id?: number | null
+  date: string
+  timestamp: string | null
+  status: "Present" | "Absent" | "Late"
+  statusIndicator?: string
+  classroomId?: number | null
+  classroomName?: string | null
+  markedVia?: string | null
+  marked_via?: string | null
+  markedBy?: number | null
+  marked_by?: number | null
+}
+
 export interface TeacherAttendanceOverview {
   date: string
   classroomId: number | null
   classrooms: Classroom[]
+  selectedGrade?: string
+  selected_grade?: string
+  selectedSubject?: string
+  selected_subject?: string
+  grades?: string[]
+  subjects?: string[]
   summary: {
     totalStudents: number
     presentCount: number
     absentCount: number
     lateCount: number
+    totalRecords?: number
+    selectedGrade?: string
   }
   students: TeacherAttendanceStudentRow[]
+  records?: TeacherAttendanceHistoryRecord[]
 }
 
 export interface TimetableSlot {
