@@ -13,15 +13,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { downloadBlob } from "@/lib/download"
 import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
+import { getTeacherNav } from "@/lib/teacher-nav"
 import { exportAttendancePdf, getClassroomAttendance, markAttendance } from "@/services/attendance"
 import type { AttendanceRecord, AttendanceSummary, Classroom } from "@/types"
-
-const teacherNav = [
-  { href: "/teacher/dashboard", label: "Dashboard" },
-  { href: "/teacher/attendance", label: "Attendance" },
-  { href: "/teacher/attendance/kiosk", label: "Face Kiosk" },
-  { href: "/teacher/attendance/reports", label: "Reports" },
-]
 
 export default function ClassroomAttendancePage() {
   const params = useParams()
@@ -119,7 +113,7 @@ export default function ClassroomAttendancePage() {
   }
 
   return (
-    <DashboardShell title="Live Attendance" navItems={teacherNav} allowedRoles={["teacher"]}>
+    <DashboardShell title="Live Attendance" navItems={getTeacherNav()} allowedRoles={["teacher"]}>
       <div className="grid gap-6">
         <Card>
           <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
