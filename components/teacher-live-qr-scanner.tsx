@@ -215,24 +215,69 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
           scannedId
         const enrolled =
           result.enrolledSubjects ?? result.enrolled_subjects ?? []
-        const autoDetails = (result.autoMarkedDetails ?? []).map(
-          (item) => item.label || `${item.subjectName ?? item.subject_name} - Present`,
+        const subjects =
+          result.markedAttendanceSubjects ??
+          result.marked_attendance_subjects ??
+          result.autoMarkedSubjects ??
+          result.newlyMarkedSubjects ??
+          []
+        const newlyMarked = result.newlyMarkedSubjects ?? []
+        const alreadyMarked = result.alreadyMarkedSubjects ?? []
+        const presentDetails = (result.presentNowDetails ?? []).map(
+          (item) => item.label || `${item.subjectName ?? item.subject_name}`,
         )
-        const subjects = result.autoMarkedSubjects ?? result.newlyMarkedSubjects ?? []
+        const alreadyDetails = (result.alreadyMarkedDetails ?? []).map(
+          (item) =>
+            item.label || `Already marked for ${item.subjectName ?? item.subject_name}.`,
+        )
 
         setLastScan(
           [
             `${name} (${regNo})`,
             enrolled.length ? `Enrolled: ${enrolled.join(", ")}` : null,
-            autoDetails.length
-              ? `Auto-marked: ${autoDetails.join("; ")}`
-              : subjects.length
-                ? `Auto-marked: ${subjects.join(", ")}`
-                : "Present",
+            newlyMarked.length || presentDetails.length
+              ? `Marked: ${presentDetails.length ? presentDetails.join("; ") : newlyMarked.join(", ")}`
+              : alreadyMarked.length
+                ? alreadyDetails[0] || `Already marked for ${alreadyMarked.join(", ")}`
+                : "No class scheduled now",
           ]
             .filter(Boolean)
             .join(" · "),
         )
+
+        if (subjects.length === 0 || result.status === "NoClass") {
+          toast.message(
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">
+                {name} · ID {regNo}
+              </p>
+              {enrolled.length > 0 && (
+                <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
+              )}
+              <p>No timetable class at this time — nothing marked.</p>
+            </div>,
+          )
+          return
+        }
+
+        if (result.status === "AlreadyMarked" || (newlyMarked.length === 0 && alreadyMarked.length > 0)) {
+          toast.message(
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">
+                {name} · ID {regNo}
+              </p>
+              {enrolled.length > 0 && (
+                <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
+              )}
+              <p>
+                ⚠️{" "}
+                {alreadyDetails[0] ||
+                  `Already marked for ${alreadyMarked.join(", ") || "current class"}.`}
+              </p>
+            </div>,
+          )
+          return
+        }
 
         toast.success(
           <div className="space-y-1 text-sm">
@@ -242,13 +287,13 @@ export function TeacherLiveQrScanner({ classroomId, onMarked }: TeacherLiveQrSca
             {enrolled.length > 0 && (
               <p>Enrolled: {enrolled.map((subject) => `[${subject}]`).join(" ")}</p>
             )}
-            {autoDetails.length > 0 ? (
-              <p>Auto-marked: {autoDetails.join("; ")}</p>
-            ) : subjects.length > 0 ? (
-              <p>Auto-marked: {subjects.join(", ")}</p>
-            ) : (
-              <p>Marked Present</p>
-            )}
+            <p>
+              ✅{" "}
+              {presentDetails.length > 0
+                ? presentDetails.join("; ")
+                : newlyMarked.join(", ") || subjects.join(", ")}
+            </p>
+            {alreadyDetails.length > 0 && <p>⚠️ {alreadyDetails.join(" ")}</p>}
           </div>,
         )
         if (attendance) {
