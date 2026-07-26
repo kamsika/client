@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   Activity,
+  ClipboardCheck,
   ClipboardList,
   Loader2,
   QrCode,
@@ -196,7 +197,13 @@ export function TeacherOverview() {
           <Link href="/teacher/dashboard/qr-scanner">
             <Button type="button" className={primaryBtn}>
               <QrCode className="size-4" />
-              Open QR Scanner
+              Scan QR Attendance
+            </Button>
+          </Link>
+          <Link href="/teacher/dashboard/manual">
+            <Button type="button" variant="outline" className={outlineBtn}>
+              <ClipboardCheck className="size-4" />
+              Manual Attendance
             </Button>
           </Link>
         </div>

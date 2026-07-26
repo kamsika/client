@@ -243,6 +243,7 @@ export interface ManualAttendanceStudentRow {
   studentId: number
   fullName: string | null
   registrationNo: string
+  grade?: string | null
   status: "Present" | "Absent" | "Late" | null
   statusIndicator: string
   markedVia: string | null
@@ -263,12 +264,14 @@ export async function getManualAttendanceRoster(params: {
   classroomId: number
   subjectName?: string
   date?: string
+  grade?: string
 }) {
   const { data } = await apiClient.get<ManualAttendanceRoster>("/api/attendance/manual", {
     params: {
       classroomId: params.classroomId,
       subjectName: params.subjectName,
       date: params.date,
+      grade: params.grade && params.grade !== "All" ? params.grade : undefined,
     },
   })
   return data
@@ -279,6 +282,7 @@ export async function saveManualAttendance(payload: {
   subjectName: string
   date: string
   markingTime?: string
+  forceOverwrite?: boolean
   students: Array<{ studentId: number; status: "Present" | "Absent" | "Late" }>
 }) {
   const { data } = await apiClient.post<{
@@ -287,8 +291,15 @@ export async function saveManualAttendance(payload: {
     count: number
     records: Attendance[]
     markedVia: "manual"
+    attendanceMethod?: "Manual"
     errors?: string[] | null
-  }>("/api/attendance/manual", payload)
+    qrConflicts?: Array<{ studentId: number; fullName?: string | null }> | null
+    code?: string
+  }>("/api/attendance/manual", {
+    ...payload,
+    forceOverwrite: payload.forceOverwrite,
+    overwriteQr: payload.forceOverwrite,
+  })
   return data
 }
 

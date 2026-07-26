@@ -89,6 +89,20 @@ function formatDateOnly(dateISO: string | null | undefined, fallbackISO: string)
   })
 }
 
+function formatMethod(record: TeacherAttendanceHistoryRecord) {
+  const method =
+    record.attendanceMethod ||
+    record.attendance_method ||
+    (record.markedVia === "qr"
+      ? "QR"
+      : record.markedVia === "manual"
+        ? "Manual"
+        : record.markedVia === "face"
+          ? "Face"
+          : null)
+  return method || "—"
+}
+
 function formatTimeOnly(timestamp: string | null | undefined) {
   const date = parseApiTimestamp(timestamp)
   if (!date) return "—"
@@ -426,13 +440,14 @@ export function TeacherAttendanceHistory() {
                   <TableHead className={cn(thClass, "w-[16%] text-left")}>Subject</TableHead>
                   <TableHead className={cn(thClass, "w-[12%] text-left")}>Date</TableHead>
                   <TableHead className={cn(thClass, "w-[12%] text-left")}>Time</TableHead>
-                  <TableHead className={cn(thClass, "w-[14%] text-center")}>Status</TableHead>
+                  <TableHead className={cn(thClass, "w-[10%] text-center")}>Method</TableHead>
+                  <TableHead className={cn(thClass, "w-[12%] text-center")}>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                    <TableCell colSpan={8} className="h-28 text-center text-[#0047AB]/70">
                       <span className="inline-flex items-center justify-center gap-2">
                         <Loader2 className="size-4 animate-spin" />
                         Loading attendance…
@@ -441,7 +456,7 @@ export function TeacherAttendanceHistory() {
                   </TableRow>
                 ) : records.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={7} className="h-28 text-center text-[#0047AB]/70">
+                    <TableCell colSpan={8} className="h-28 text-center text-[#0047AB]/70">
                       No attendance records match your filters.
                     </TableCell>
                   </TableRow>
@@ -485,6 +500,9 @@ export function TeacherAttendanceHistory() {
                         )}
                       >
                         {formatTimeOnly(record.timestamp)}
+                      </TableCell>
+                      <TableCell className={cn(tdClass, "text-center text-[#05082E]")}>
+                        {formatMethod(record)}
                       </TableCell>
                       <TableCell className={cn(tdClass, "text-center")}>
                         <div className="flex justify-center">

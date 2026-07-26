@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  ClipboardCheck,
   ClipboardList,
   LayoutDashboard,
   QrCode,
@@ -32,6 +33,12 @@ export function getTeacherNav(): TeacherNavItem[] {
       label: "QR Scanner",
       description: "Mark by QR code",
       icon: QrCode,
+    },
+    {
+      href: "/teacher/dashboard/manual",
+      label: "Manual Attendance",
+      description: "Mark roster by hand",
+      icon: ClipboardCheck,
     },
     {
       href: "/teacher/dashboard/attendance",

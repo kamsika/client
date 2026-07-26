@@ -178,6 +178,8 @@ export interface Attendance {
   subjectName?: string | null
   marked_via?: string | null
   markedVia?: string | null
+  attendance_method?: string | null
+  attendanceMethod?: string | null
   marked_by: number | null
   checker_id?: number | null
   checkerId?: number | null
@@ -286,6 +288,8 @@ export interface TeacherAttendanceHistoryRecord {
   classroomName?: string | null
   markedVia?: string | null
   marked_via?: string | null
+  attendanceMethod?: string | null
+  attendance_method?: string | null
   markedBy?: number | null
   marked_by?: number | null
 }

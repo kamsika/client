@@ -12,6 +12,12 @@ export function getApiErrorMessage(error: unknown, fallback = "Something went wr
   return fallback
 }
 
+export function isManualQrConflict(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) return false
+  const data = error.response.data as { code?: string } | undefined
+  return data?.code === "qr_conflict"
+}
+
 export function isAlreadyScannedError(error: unknown): boolean {
   if (!axios.isAxiosError(error) || error.response?.status !== 409) return false
   const data = error.response.data as
