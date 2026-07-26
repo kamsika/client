@@ -106,6 +106,22 @@ export function ScannedStudentDetailsCard({
     "—"
   const photo = photoUrl(student)
   const selectableCount = subjects.filter((item) => !item.alreadyMarked).length
+  const feeInfo =
+    student.currentMonthFee ||
+    student.current_month_fee ||
+    student.monthlyPayment ||
+    student.monthly_payment ||
+    null
+  const feeStatus = (
+    feeInfo?.paymentStatus ||
+    feeInfo?.payment_status ||
+    student.paymentStatus ||
+    student.payment_status ||
+    "Pending"
+  ).trim()
+  const feePending = feeStatus !== "Paid"
+  const feeAmount = feeInfo?.amount ?? feeInfo?.amount_due ?? feeInfo?.amountDue ?? null
+  const feeMonthLabel = feeInfo?.monthName || feeInfo?.month_name || null
 
   function toggleSubject(key: string, disabled: boolean) {
     if (disabled || marking || marked) return
@@ -240,6 +256,38 @@ export function ScannedStudentDetailsCard({
               })}
             </ul>
           )}
+        </div>
+
+        <div className="rounded-xl border border-[#A2D4ED]/60 bg-[#f8fbfe] px-3 py-3">
+          <p className="text-xs font-medium tracking-wide text-[#0047AB]/70 uppercase">
+            Fee Status
+          </p>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-[#05082E]">Current Month Fee:</p>
+            {feeStatus === "Paid" ? (
+              <Badge
+                variant="outline"
+                className="border-emerald-200 bg-emerald-50 text-emerald-800"
+              >
+                Paid ✅
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">
+                Pending ⚠️
+              </Badge>
+            )}
+          </div>
+          {feeAmount != null ? (
+            <p className="mt-1 text-xs text-[#0047AB]/75">
+              Amount: {Number(feeAmount).toLocaleString()}
+              {feeMonthLabel ? ` · ${feeMonthLabel}` : ""}
+            </p>
+          ) : null}
+          {feePending ? (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+              Fee payment pending. Attendance can still be marked.
+            </p>
+          ) : null}
         </div>
       </CardContent>
 

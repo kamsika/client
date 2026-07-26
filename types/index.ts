@@ -118,6 +118,43 @@ export interface Student {
   classroom_name?: string | null
   classroomName?: string | null
   classroom?: { id: number; name: string; grade?: string | null } | null
+  monthlyPayment?: StudentFeePayment | null
+  monthly_payment?: StudentFeePayment | null
+  currentMonthFee?: StudentFeePayment | null
+  current_month_fee?: StudentFeePayment | null
+  paymentStatus?: "Pending" | "Paid" | "Overdue"
+  payment_status?: "Pending" | "Paid" | "Overdue"
+}
+
+export interface StudentFeePayment {
+  id?: number | null
+  student_id?: number
+  studentId?: number
+  student_name?: string | null
+  studentName?: string | null
+  registration_no?: string | null
+  registrationNo?: string | null
+  grade?: string | null
+  month?: number | null
+  year?: number | null
+  month_name?: string | null
+  monthName?: string | null
+  amount?: number | null
+  amount_due?: number | null
+  amountDue?: number | null
+  payment_status: "Pending" | "Paid" | "Overdue"
+  paymentStatus?: "Pending" | "Paid" | "Overdue"
+  payment_date?: string | null
+  paymentDate?: string | null
+  billing_period?: string
+  billingPeriod?: string
+  paid_at?: string | null
+  paidAt?: string | null
+  exists?: boolean
+  created_at?: string | null
+  createdAt?: string | null
+  updated_at?: string | null
+  updatedAt?: string | null
 }
 
 export interface Attendance {

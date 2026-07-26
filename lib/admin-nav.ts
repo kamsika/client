@@ -6,6 +6,7 @@ import {
   MessageSquare,
   School,
   Upload,
+  Wallet,
   type LucideIcon,
 } from "lucide-react"
 
@@ -43,6 +44,12 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       description: "Overview & management",
       icon: LayoutDashboard,
       exact: true,
+    },
+    {
+      href: "/admin/fees",
+      label: "Fee Management",
+      description: "Student monthly fees",
+      icon: Wallet,
     },
     {
       href: "/admin/billing",
