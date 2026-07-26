@@ -8,6 +8,7 @@ export function getAdminNav(isSuperAdmin: boolean) {
       { href: "/admin/attendance", label: "Attendance" },
       { href: "/admin/attendance/kiosk", label: "Face Kiosk" },
       { href: "/admin/attendance/reports", label: "Reports" },
+      { href: "/admin/timetable", label: "Timetable" },
       { href: "/admin/sms-logs", label: "SMS Logs" },
       { href: "/admin/students/import", label: "Import Students" },
       { href: "/admin/students/face", label: "Face Registration" },
