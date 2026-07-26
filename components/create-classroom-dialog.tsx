@@ -117,11 +117,25 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
     return Array.from(new Set([...DEFAULT_ENROLLABLE_SUBJECTS, ...fromAssignments]))
   }, [assignments])
 
-  const teacherById = useMemo(() => {
-    const map = new Map<number, User>()
-    teachers.forEach((teacher) => map.set(teacher.id, teacher))
-    return map
-  }, [teachers])
+  const assignedSubjects = useMemo(
+    () => assignments.map((item) => item.subject.trim()).filter(Boolean),
+    [assignments],
+  )
+
+  const slotsByDay = useMemo(() => {
+    const grouped: Record<string, TimetableRow[]> = {}
+    for (const day of DAYS) grouped[day] = []
+    for (const slot of slots) {
+      const day = DAYS.includes(slot.dayOfWeek as (typeof DAYS)[number])
+        ? slot.dayOfWeek
+        : "Monday"
+      grouped[day].push(slot)
+    }
+    for (const day of DAYS) {
+      grouped[day].sort((a, b) => a.startTime.localeCompare(b.startTime))
+    }
+    return grouped
+  }, [slots])
 
   function resetForm() {
     setName("")
@@ -154,6 +168,23 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
         return next
       }),
     )
+  }
+
+  function addSlotForDay(dayOfWeek: string) {
+    setSlots((current) => [
+      ...current,
+      {
+        ...emptySlot(),
+        dayOfWeek,
+      },
+    ])
+  }
+
+  function removeSlot(id: string) {
+    setSlots((current) => {
+      if (current.length <= 1) return current
+      return current.filter((item) => item.id !== id)
+    })
   }
 
   function validate() {
@@ -444,23 +475,11 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
 
           {/* Weekly Timetable */}
           <section className="rounded-2xl border border-[#A2D4ED]/50 bg-white p-4 shadow-[0_6px_18px_rgba(5,8,46,0.04)]">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-[#05082E]">Weekly Timetable</h3>
-                <p className="text-xs text-[#0047AB]/70">
-                  Day, time, subject, and teacher for each class period
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className={outlineBtn}
-                onClick={() => setSlots((current) => [...current, emptySlot()])}
-              >
-                <Plus className="size-3.5" />
-                Add Timetable Slot
-              </Button>
+            <div>
+              <h3 className="text-sm font-semibold text-[#05082E]">Weekly Timetable</h3>
+              <p className="text-xs text-[#0047AB]/70">
+                Grouped by day — add compact period rows under each day
+              </p>
             </div>
 
             {errors.timetable ? (
@@ -468,112 +487,139 @@ export function CreateClassroomDialog({ teachers, onCreated }: CreateClassroomDi
             ) : null}
 
             <div className="mt-3 space-y-3">
-              {slots.map((slot, index) => {
-                const assignedSubjects = assignments
-                  .map((item) => item.subject.trim())
-                  .filter(Boolean)
-                const teacherName = slot.teacherId
-                  ? teacherById.get(Number(slot.teacherId))?.full_name
-                  : null
-
+              {DAYS.map((day) => {
+                const daySlots = slotsByDay[day] ?? []
                 return (
                   <div
-                    key={slot.id}
-                    className="rounded-xl border border-[#A2D4ED]/40 bg-[#f8fbfe] p-3"
+                    key={day}
+                    className="overflow-hidden rounded-xl border border-[#A2D4ED]/45 bg-white"
                   >
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="text-xs font-semibold tracking-wide text-[#0047AB] uppercase">
-                        Slot {index + 1}
-                        {teacherName ? ` · ${teacherName}` : ""}
-                      </p>
+                    <div className="flex items-center justify-between gap-2 border-b border-[#A2D4ED]/35 bg-[#f4f7fb] px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-semibold text-[#05082E]">{day}</h4>
+                        <span className="rounded-md bg-[#ABD2F2]/45 px-1.5 py-0.5 text-[10px] font-semibold text-[#0047AB]">
+                          {daySlots.length} {daySlots.length === 1 ? "period" : "periods"}
+                        </span>
+                      </div>
                       <Button
                         type="button"
                         variant="outline"
-                        size="icon"
-                        className="size-8 border-red-200 text-red-600 hover:bg-red-50"
-                        disabled={slots.length <= 1}
-                        onClick={() => setSlots((current) => current.filter((item) => item.id !== slot.id))}
+                        size="sm"
+                        className={cn(outlineBtn, "h-7 gap-1 px-2 text-xs")}
+                        onClick={() => addSlotForDay(day)}
                       >
-                        <Trash2 className="size-3.5" />
+                        <Plus className="size-3" />
+                        Add Slot
                       </Button>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-[#0047AB]">Day</Label>
-                        <Select
-                          value={slot.dayOfWeek}
-                          onValueChange={(value) => value && updateSlot(slot.id, { dayOfWeek: value })}
-                        >
-                          <SelectTrigger className={cn(fieldClass, "w-full")}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DAYS.map((day) => (
-                              <SelectItem key={day} value={day}>
-                                {day}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+
+                    {daySlots.length === 0 ? (
+                      <p className="px-3 py-3 text-xs text-[#0047AB]/60">
+                        No periods yet. Click Add Slot to schedule classes for {day}.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <div className="hidden min-w-[520px] grid-cols-[1fr_1fr_1.3fr_1.5fr_auto] gap-2 border-b border-[#A2D4ED]/25 bg-[#f8fbfe] px-3 py-1.5 text-[10px] font-semibold tracking-wide text-[#0047AB] uppercase md:grid">
+                          <span>Start</span>
+                          <span>End</span>
+                          <span>Subject</span>
+                          <span>Teacher</span>
+                          <span className="sr-only">Actions</span>
+                        </div>
+
+                        <div className="divide-y divide-[#A2D4ED]/25">
+                          {daySlots.map((slot) => (
+                            <div
+                              key={slot.id}
+                              className="grid grid-cols-1 gap-2 px-3 py-2.5 sm:grid-cols-2 md:min-w-[520px] md:grid-cols-[1fr_1fr_1.3fr_1.5fr_auto] md:items-center"
+                            >
+                              <div className="space-y-1 md:space-y-0">
+                                <Label className="text-[10px] text-[#0047AB] md:hidden">Start</Label>
+                                <Input
+                                  type="time"
+                                  className={cn(fieldClass, "h-9")}
+                                  value={slot.startTime}
+                                  onChange={(e) =>
+                                    updateSlot(slot.id, { startTime: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-1 md:space-y-0">
+                                <Label className="text-[10px] text-[#0047AB] md:hidden">End</Label>
+                                <Input
+                                  type="time"
+                                  className={cn(fieldClass, "h-9")}
+                                  value={slot.endTime}
+                                  onChange={(e) =>
+                                    updateSlot(slot.id, { endTime: e.target.value })
+                                  }
+                                />
+                              </div>
+                              <div className="space-y-1 sm:col-span-2 md:col-span-1 md:space-y-0">
+                                <Label className="text-[10px] text-[#0047AB] md:hidden">
+                                  Subject
+                                </Label>
+                                <Select
+                                  value={slot.subject || undefined}
+                                  onValueChange={(value) =>
+                                    value && updateSlot(slot.id, { subject: value })
+                                  }
+                                >
+                                  <SelectTrigger className={cn(fieldClass, "h-9 w-full")}>
+                                    <SelectValue placeholder="Subject" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(assignedSubjects.length
+                                      ? assignedSubjects
+                                      : [...DEFAULT_ENROLLABLE_SUBJECTS]
+                                    ).map((subject) => (
+                                      <SelectItem key={subject} value={subject}>
+                                        {subject}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1 sm:col-span-2 md:col-span-1 md:space-y-0">
+                                <Label className="text-[10px] text-[#0047AB] md:hidden">
+                                  Teacher
+                                </Label>
+                                <Select
+                                  value={slot.teacherId || undefined}
+                                  onValueChange={(value) =>
+                                    value && updateSlot(slot.id, { teacherId: value })
+                                  }
+                                >
+                                  <SelectTrigger className={cn(fieldClass, "h-9 w-full")}>
+                                    <SelectValue placeholder="Teacher" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {teachers.map((teacher) => (
+                                      <SelectItem key={teacher.id} value={String(teacher.id)}>
+                                        {teacher.full_name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex justify-end sm:col-span-2 md:col-span-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="size-8 border-red-200 text-red-600 hover:bg-red-50"
+                                  disabled={slots.length <= 1}
+                                  onClick={() => removeSlot(slot.id)}
+                                  aria-label={`Remove ${day} period`}
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-[#0047AB]">Start</Label>
-                        <Input
-                          type="time"
-                          className={fieldClass}
-                          value={slot.startTime}
-                          onChange={(e) => updateSlot(slot.id, { startTime: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-[#0047AB]">End</Label>
-                        <Input
-                          type="time"
-                          className={fieldClass}
-                          value={slot.endTime}
-                          onChange={(e) => updateSlot(slot.id, { endTime: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-[#0047AB]">Subject</Label>
-                        <Select
-                          value={slot.subject || undefined}
-                          onValueChange={(value) => value && updateSlot(slot.id, { subject: value })}
-                        >
-                          <SelectTrigger className={cn(fieldClass, "w-full")}>
-                            <SelectValue placeholder="Subject" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(assignedSubjects.length
-                              ? assignedSubjects
-                              : [...DEFAULT_ENROLLABLE_SUBJECTS]
-                            ).map((subject) => (
-                              <SelectItem key={subject} value={subject}>
-                                {subject}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-[#0047AB]">Teacher</Label>
-                        <Select
-                          value={slot.teacherId || undefined}
-                          onValueChange={(value) => value && updateSlot(slot.id, { teacherId: value })}
-                        >
-                          <SelectTrigger className={cn(fieldClass, "w-full")}>
-                            <SelectValue placeholder="Teacher" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teachers.map((teacher) => (
-                              <SelectItem key={teacher.id} value={String(teacher.id)}>
-                                {teacher.full_name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )
               })}
