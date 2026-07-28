@@ -1,9 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { ScanFace } from "lucide-react"
 import { toast } from "sonner"
 
 import { EnrolledSubjectsPicker } from "@/components/enrolled-subjects-picker"
+import { RegisterFaceDialog } from "@/components/face/RegisterFaceDialog"
 import { StudentQrCode } from "@/components/student-qr-code"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -39,6 +41,8 @@ export function AdminStudentProfile({ student, onStudentUpdated }: AdminStudentP
   const label = studentQrLabel(student)
   const [enrolledSubjects, setEnrolledSubjects] = useState<string[]>(() => enrolledList(student))
   const [saving, setSaving] = useState(false)
+  const [faceDialogOpen, setFaceDialogOpen] = useState(false)
+  const [faceRegistered, setFaceRegistered] = useState(Boolean(student.has_face_descriptor))
 
   useEffect(() => {
     setEnrolledSubjects(enrolledList(student))
@@ -156,6 +160,27 @@ export function AdminStudentProfile({ student, onStudentUpdated }: AdminStudentP
         <Button type="button" onClick={() => void handleSaveSubjects()} disabled={saving}>
           {saving ? "Saving…" : "Save Enrolled Subjects"}
         </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="border-[#A2D4ED] text-[#0047AB]"
+          onClick={() => setFaceDialogOpen(true)}
+        >
+          <ScanFace className="size-4" />
+          Register Face
+          {faceRegistered ? " (update)" : ""}
+        </Button>
+
+        <RegisterFaceDialog
+          student={student}
+          open={faceDialogOpen}
+          onOpenChange={setFaceDialogOpen}
+          onRegistered={() => {
+            setFaceRegistered(true)
+            onStudentUpdated?.({ ...student, has_face_descriptor: true })
+          }}
+        />
       </div>
 
       <div className="flex flex-col items-center gap-4 rounded-lg border bg-white p-5 text-black">

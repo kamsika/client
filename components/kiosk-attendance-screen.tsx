@@ -82,6 +82,10 @@ interface KioskAttendanceScreenProps {
   fixedClassroomId?: number
   /** Milliseconds before the same student can trigger again (default 5000). */
   cooldownMs?: number
+  matchThreshold?: number
+  autoAttendance?: boolean
+  soundNotification?: boolean
+  cameraDeviceId?: string
 }
 
 function initials(name: string) {
@@ -120,6 +124,10 @@ function pruneRecentDetections(
 export function KioskAttendanceScreen({
   fixedClassroomId,
   cooldownMs = KIOSK_COOLDOWN_MS,
+  matchThreshold = KIOSK_MATCH_THRESHOLD,
+  autoAttendance = true,
+  soundNotification = true,
+  cameraDeviceId,
 }: KioskAttendanceScreenProps = {}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -131,6 +139,10 @@ export function KioskAttendanceScreen({
   const detectingRef = useRef(false)
   const classroomIdRef = useRef<number | null>(null)
   const cooldownMsRef = useRef(cooldownMs)
+  const matchThresholdRef = useRef(matchThreshold)
+  const autoAttendanceRef = useRef(autoAttendance)
+  const soundNotificationRef = useRef(soundNotification)
+  const cameraDeviceIdRef = useRef(cameraDeviceId)
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomId, setClassroomId] = useState<string>(
@@ -174,7 +186,11 @@ export function KioskAttendanceScreen({
 
   useEffect(() => {
     cooldownMsRef.current = cooldownMs
-  }, [cooldownMs])
+    matchThresholdRef.current = matchThreshold
+    autoAttendanceRef.current = autoAttendance
+    soundNotificationRef.current = soundNotification
+    cameraDeviceIdRef.current = cameraDeviceId
+  }, [cooldownMs, matchThreshold, autoAttendance, soundNotification, cameraDeviceId])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(formatClock(new Date())), 1000)
@@ -196,11 +212,17 @@ export function KioskAttendanceScreen({
 
     const matcher = await createFaceMatcher(
       enrolled.map((p) => ({ id: p.id, descriptor: p.descriptor as number[] })),
-      KIOSK_MATCH_THRESHOLD,
+      matchThresholdRef.current,
     )
     matcherRef.current = matcher
     setMatcherReady(Boolean(matcher))
-  }, [])
+  }, [matchThreshold])
+
+  useEffect(() => {
+    if (profiles.length > 0) {
+      void rebuildMatcher(profiles)
+    }
+  }, [matchThreshold, profiles, rebuildMatcher])
 
   useEffect(() => {
     let cancelled = false
@@ -279,7 +301,7 @@ export function KioskAttendanceScreen({
         await loadFaceModels()
         setModelsReady(true)
       }
-      await startFaceCamera(videoRef.current)
+      await startFaceCamera(videoRef.current, cameraDeviceIdRef.current)
       setCameraActive(true)
       setScanning(true)
     } catch (error) {
@@ -424,7 +446,9 @@ export function KioskAttendanceScreen({
         return
       }
 
-      playSuccessChime()
+      if (soundNotificationRef.current) {
+        playSuccessChime()
+      }
       if (newlyMarked.length > 0) {
         toast.success(`Marked: ${newlyMarked.join(", ")}`)
       }
@@ -529,6 +553,19 @@ export function KioskAttendanceScreen({
         const detections = await detectFacesWithBoxes(video)
         if (cancelled) return
 
+        if (detections.length > 1) {
+          drawFaceOverlays(
+            canvas,
+            video,
+            detections.map((detection) => ({
+              box: detection.box,
+              label: "Multiple faces",
+              matched: false,
+            })),
+          )
+          return
+        }
+
         const overlays: Array<{
           box: (typeof detections)[0]["box"]
           label?: string
@@ -560,6 +597,10 @@ export function KioskAttendanceScreen({
         drawFaceOverlays(canvas, video, overlays)
 
         if (!bestMatch || markingRef.current) {
+          return
+        }
+
+        if (!autoAttendanceRef.current) {
           return
         }
 

@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   QrCode,
+  ScanFace,
   UserRound,
   Users,
   Wallet,
@@ -29,10 +30,22 @@ export function getTeacherNav(): TeacherNavItem[] {
       exact: true,
     },
     {
+      href: "/teacher/dashboard/attendance-methods",
+      label: "Attendance",
+      description: "QR or Face methods",
+      icon: ClipboardCheck,
+    },
+    {
       href: "/teacher/dashboard/qr-scanner",
       label: "QR Scanner",
       description: "Mark by QR code",
       icon: QrCode,
+    },
+    {
+      href: "/teacher/dashboard/face-scanner",
+      label: "Face Scanner",
+      description: "Mark by face recognition",
+      icon: ScanFace,
     },
     {
       href: "/teacher/dashboard/manual",

@@ -8,6 +8,18 @@ export const FACE_MATCH_THRESHOLD = 0.55
 /** Default distance threshold for kiosk FaceMatcher matching. */
 export const KIOSK_MATCH_THRESHOLD = 0.6
 
+/** Average multiple 128-d descriptors (multi-angle registration). */
+export function averageEmbeddings(vectors: number[][]): number[] | null {
+  const valid = vectors.filter((v) => v.length === 128)
+  if (valid.length === 0) return null
+  const dim = 128
+  const sums = new Array(dim).fill(0)
+  for (const vec of valid) {
+    for (let i = 0; i < dim; i += 1) sums[i] += vec[i]
+  }
+  return sums.map((value) => value / valid.length)
+}
+
 let modelsLoaded = false
 let modelsLoading: Promise<void> | null = null
 
@@ -283,8 +295,10 @@ export function matchFaceDescriptor(
   return best
 }
 
-async function startCameraStream(video: HTMLVideoElement): Promise<MediaStream> {
-  const attempts: MediaTrackConstraints[] = [{}, { facingMode: "user" }, { facingMode: "environment" }]
+async function startCameraStream(video: HTMLVideoElement, deviceId?: string): Promise<MediaStream> {
+  const attempts: MediaTrackConstraints[] = deviceId
+    ? [{ deviceId: { exact: deviceId } }, { deviceId }]
+    : [{}, { facingMode: "user" }, { facingMode: "environment" }]
 
   // Restarting a camera must release the previous stream first. Otherwise the
   // old stream is lost when srcObject is replaced and keeps the camera busy.
@@ -309,8 +323,8 @@ async function startCameraStream(video: HTMLVideoElement): Promise<MediaStream> 
   throw lastError ?? new Error("Unable to access camera")
 }
 
-export async function startFaceCamera(video: HTMLVideoElement): Promise<MediaStream> {
-  return startCameraStream(video)
+export async function startFaceCamera(video: HTMLVideoElement, deviceId?: string): Promise<MediaStream> {
+  return startCameraStream(video, deviceId)
 }
 
 export function stopFaceCamera(video: HTMLVideoElement) {

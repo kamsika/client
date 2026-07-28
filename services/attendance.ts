@@ -224,6 +224,8 @@ export async function markKioskAttendance(payload: {
       status: "Present",
       timestamp: payload.timestamp ?? new Date().toISOString(),
       selectedSubjects: payload.selectedSubjects,
+      markedVia: "face",
+      marked_via: "face",
     },
   )
   return data
