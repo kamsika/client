@@ -36,7 +36,7 @@ export default function TeacherAttendanceMethodsPage() {
         </Link>
 
         <Link href={faceHref} className={cn(cardShell, "group block")}>
-          <span className="inline-flex size-12 items-center justify-center rounded-xl bg-[#F9BF15]/25 text-[#E88D1D]">
+          <span className="inline-flex size-12 items-center justify-center rounded-xl bg-[#A2D4ED]/50 text-[#0047AB]">
             <ScanFace className="size-6" />
           </span>
           <h3 className="mt-4 text-lg font-semibold text-[#05082E]">Face Attendance</h3>

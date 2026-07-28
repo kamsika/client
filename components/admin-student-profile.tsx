@@ -164,7 +164,7 @@ export function AdminStudentProfile({ student, onStudentUpdated }: AdminStudentP
         <Button
           type="button"
           variant="outline"
-          className="border-[#A2D4ED] text-[#0047AB]"
+          className="border-[#A2D4ED] text-[#0047AB] hover:bg-[#ABD2F2]/40"
           onClick={() => setFaceDialogOpen(true)}
         >
           <ScanFace className="size-4" />

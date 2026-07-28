@@ -71,11 +71,11 @@ export function RecognitionResultCard({
 
   const tone =
     state === "recognized"
-      ? "border-emerald-300/70 bg-emerald-50/80"
+      ? "border-emerald-200 bg-emerald-50/90"
       : state === "already_marked"
-        ? "border-sky-300/70 bg-sky-50/80"
+        ? "border-amber-200 bg-amber-50/90"
         : state === "unknown" || state === "multiple_faces"
-          ? "border-amber-300/70 bg-amber-50/80"
+          ? "border-amber-200 bg-amber-50/80"
           : "border-[#A2D4ED]/60 bg-white"
 
   return (
@@ -125,7 +125,12 @@ export function RecognitionResultCard({
               )}
               <div className="flex flex-wrap gap-2 pt-1">
                 {attendanceStatus && (
-                  <Badge className="bg-emerald-600 hover:bg-emerald-600">{attendanceStatus}</Badge>
+                  <Badge
+                    variant="outline"
+                    className="border-emerald-200 bg-emerald-50 text-emerald-800"
+                  >
+                    {attendanceStatus}
+                  </Badge>
                 )}
                 {feeStatus && (
                   <Badge variant="outline" className="border-[#A2D4ED] text-[#0047AB]">

@@ -18,6 +18,11 @@ import { getApiErrorMessage } from "@/lib/api-errors"
 import { registerFaceEmbeddings } from "@/services/student-face"
 import type { Student } from "@/types"
 
+const primaryBtn =
+  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
+
+const outlineBtn = "border-[#A2D4ED] text-[#0047AB] hover:bg-[#ABD2F2]/40"
+
 const TARGET_SAMPLES = 25
 const SAMPLE_INTERVAL_MS = 450
 
@@ -145,7 +150,7 @@ export function RegisterFaceDialog({
             <ScanFace className="size-5 text-[#0047AB]" />
             Register Face
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-[#0047AB]/75">
             Capture {TARGET_SAMPLES} angles for {student.full_name || student.registration_no}. Only
             the averaged embedding is stored — no photos are saved.
           </DialogDescription>
@@ -175,13 +180,13 @@ export function RegisterFaceDialog({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => void startCamera()} disabled={capturing}>
+          <Button type="button" variant="outline" className={outlineBtn} onClick={() => void startCamera()} disabled={capturing}>
             <Camera className="size-4" />
             {cameraActive ? "Restart camera" : "Enable camera"}
           </Button>
           <Button
             type="button"
-            className="bg-[#F9BF15] font-semibold text-[#05082E] hover:bg-[#E88D1D] hover:text-white"
+            className={primaryBtn}
             disabled={!cameraActive || capturing || saving}
             onClick={() => void captureSamples()}
           >

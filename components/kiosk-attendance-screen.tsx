@@ -49,6 +49,12 @@ const DETECT_INTERVAL_MS = 300
 export const KIOSK_COOLDOWN_MS = 5000
 const FEEDBACK_MS = 5500
 
+const primaryBtn =
+  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
+
+const kioskOutlineOnVideo =
+  "border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+
 interface KioskLogEntry {
   id: string
   studentId: number
@@ -645,7 +651,7 @@ export function KioskAttendanceScreen({
         onConfirm={confirmUpcomingClasses}
       />
       {/* Main kiosk stage */}
-      <section className="relative flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-2xl bg-zinc-950 text-white shadow-xl">
+      <section className="relative flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-xl border border-[#A2D4ED]/50 bg-black shadow-[0_12px_40px_rgba(5,8,46,0.05)]">
         <div className="absolute inset-0">
           <video
             ref={videoRef}
@@ -685,7 +691,10 @@ export function KioskAttendanceScreen({
               icon={<ScanFace className="size-3.5" />}
             />
             {scanning && cameraActive && (
-              <Badge className="gap-1.5 border-0 bg-emerald-500/20 text-emerald-300">
+              <Badge
+                variant="outline"
+                className="gap-1.5 border-[#A2D4ED]/80 bg-[#ABD2F2]/90 text-[#0047AB]"
+              >
                 <CircleDot className="size-3 animate-pulse" />
                 Scanning
               </Badge>
@@ -731,12 +740,12 @@ export function KioskAttendanceScreen({
               </div>
             )}
 
-            {cameraError && <p className="max-w-sm text-sm text-red-300">{cameraError}</p>}
+            {cameraError && <p className="max-w-sm text-sm text-red-200">{cameraError}</p>}
 
             <Button
               type="button"
               size="lg"
-              className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+              className={primaryBtn}
               disabled={
                 cameraStarting ||
                 modelsLoading ||
@@ -754,7 +763,7 @@ export function KioskAttendanceScreen({
               ) : (
                 <>
                   <Camera className="size-4" />
-                  Start Kiosk
+                  Start Camera
                 </>
               )}
             </Button>
@@ -765,37 +774,38 @@ export function KioskAttendanceScreen({
         {recognized && (
           <div className="pointer-events-none absolute inset-x-0 bottom-20 z-20 flex justify-center px-4">
             <div
-              className={`flex w-full max-w-lg flex-col gap-3 rounded-2xl border px-5 py-4 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-300 ${
+              className={`flex w-full max-w-lg flex-col gap-3 rounded-2xl border px-5 py-4 shadow-[0_12px_40px_rgba(5,8,46,0.12)] backdrop-blur-md animate-in fade-in zoom-in-95 duration-300 ${
                 recognized.mode === "already"
-                  ? "border-amber-400/40 bg-amber-950/90"
+                  ? "border-amber-200 bg-white/95"
                   : recognized.mode === "noclass"
-                    ? "border-white/20 bg-zinc-900/90"
-                    : "border-emerald-400/40 bg-emerald-950/90"
+                    ? "border-[#A2D4ED]/60 bg-white/95"
+                    : "border-emerald-200 bg-white/95"
               }`}
             >
               <div className="flex items-center gap-4">
                 <div
                   className={`flex size-16 shrink-0 items-center justify-center rounded-full text-xl font-bold ${
                     recognized.mode === "already"
-                      ? "bg-amber-400 text-amber-950"
-                      : "bg-emerald-400 text-emerald-950"
+                      ? "bg-amber-100 text-amber-900"
+                      : "bg-[#A2D4ED]/50 text-[#0047AB]"
                   }`}
                 >
                   {initials(recognized.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-semibold text-white">
+                  <p className="truncate text-lg font-semibold text-[#05082E]">
                     {recognized.name}
                   </p>
-                  <p className="truncate text-sm text-white/70">
+                  <p className="truncate text-sm text-[#0047AB]/75">
                     ID: {recognized.registrationNo}
                   </p>
                 </div>
                 <Badge
-                  className={`shrink-0 gap-1 border-0 ${
+                  variant="outline"
+                  className={`shrink-0 gap-1 ${
                     recognized.mode === "already"
-                      ? "bg-amber-400 text-amber-950"
-                      : "bg-emerald-400 text-emerald-950"
+                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-800"
                   }`}
                 >
                   {recognized.mode === "already" ? (
@@ -809,12 +819,16 @@ export function KioskAttendanceScreen({
 
               {recognized.enrolledSubjects.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
+                  <p className="text-xs font-medium tracking-wide text-[#0047AB]/60 uppercase">
                     Enrolled Subjects
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {recognized.enrolledSubjects.map((subject) => (
-                      <Badge key={subject} className="border-0 bg-sky-400/20 text-sky-100">
+                      <Badge
+                        key={subject}
+                        variant="outline"
+                        className="border-[#A2D4ED] bg-[#f8fbfe] text-[#0047AB]"
+                      >
                         {subject}
                       </Badge>
                     ))}
@@ -823,13 +837,14 @@ export function KioskAttendanceScreen({
               )}
 
               {recognized.paymentStatus && (
-                <div className="flex items-center gap-2 text-sm text-white/80">
-                  <span className="text-white/60">Monthly fee:</span>
+                <div className="flex items-center gap-2 text-sm text-[#0047AB]/85">
+                  <span className="text-[#0047AB]/60">Monthly fee:</span>
                   <Badge
+                    variant="outline"
                     className={
                       recognized.paymentStatus === "Paid"
-                        ? "border-0 bg-emerald-400 text-emerald-950"
-                        : "border-0 bg-amber-400 text-amber-950"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-amber-200 bg-amber-50 text-amber-900"
                     }
                   >
                     {recognized.paymentStatus}
@@ -839,13 +854,13 @@ export function KioskAttendanceScreen({
 
               {recognized.presentNowDetails.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium tracking-wide text-white/60 uppercase">
+                  <p className="text-xs font-medium tracking-wide text-[#0047AB]/60 uppercase">
                     Marked Today / Present Now
                   </p>
-                  <ul className="space-y-1 text-sm text-white">
+                  <ul className="space-y-1 text-sm text-[#05082E]">
                     {recognized.presentNowDetails.map((detail) => (
                       <li key={detail} className="flex items-start gap-2">
-                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-300" />
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-emerald-700" />
                         <span>{detail}</span>
                       </li>
                     ))}
@@ -855,13 +870,13 @@ export function KioskAttendanceScreen({
 
               {recognized.alreadyMarkedDetails.length > 0 && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium tracking-wide text-amber-200/80 uppercase">
+                  <p className="text-xs font-medium tracking-wide text-amber-800/80 uppercase">
                     Already Marked Warning
                   </p>
-                  <ul className="space-y-1 text-sm text-amber-50">
+                  <ul className="space-y-1 text-sm text-amber-900">
                     {recognized.alreadyMarkedDetails.map((detail) => (
                       <li key={detail} className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-300" />
+                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-[#E88D1D]" />
                         <span>{detail}</span>
                       </li>
                     ))}
@@ -889,7 +904,7 @@ export function KioskAttendanceScreen({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                className={kioskOutlineOnVideo}
                 onClick={() => setScanning((prev) => !prev)}
               >
                 {scanning ? "Pause scan" : "Resume scan"}
@@ -898,7 +913,7 @@ export function KioskAttendanceScreen({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="border-white/20 bg-white/10 text-white hover:bg-white/20"
+                className={kioskOutlineOnVideo}
                 onClick={handleStopCamera}
               >
                 Stop camera
@@ -909,46 +924,50 @@ export function KioskAttendanceScreen({
       </section>
 
       {/* Recent attendance sidebar */}
-      <aside className="flex w-full flex-col rounded-2xl border bg-background lg:w-80 xl:w-96">
-        <div className="border-b px-4 py-3">
-          <h3 className="font-semibold">Recent attendance</h3>
-          <p className="text-muted-foreground text-xs">
+      <aside className="flex w-full flex-col rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)] lg:w-80 xl:w-96">
+        <div className="border-b border-[#A2D4ED]/40 px-4 py-3">
+          <h3 className="font-semibold text-[#05082E]">Recent attendance</h3>
+          <p className="text-xs text-[#0047AB]/70">
             Recent scans this session · {log.length} events
           </p>
         </div>
         <div className="flex-1 overflow-y-auto">
           {log.length === 0 ? (
-            <div className="text-muted-foreground flex h-40 items-center justify-center px-4 text-center text-sm">
+            <div className="flex h-40 items-center justify-center px-4 text-center text-sm text-[#0047AB]/70">
               Recognized students will appear here as they are marked Present.
             </div>
           ) : (
-            <ul className="divide-y">
+            <ul className="divide-y divide-[#A2D4ED]/30">
               {log.map((entry) => (
                 <li key={entry.id} className="flex items-start gap-3 px-4 py-3">
-                  <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#A2D4ED]/40 text-xs font-semibold text-[#0047AB]">
                     {initials(entry.name)}
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="truncate text-sm font-medium">{entry.name}</p>
-                    <p className="text-muted-foreground truncate text-xs">
+                    <p className="truncate text-sm font-medium text-[#05082E]">{entry.name}</p>
+                    <p className="truncate text-xs text-[#0047AB]/70">
                       ID: {entry.registrationNo}
                     </p>
                     {entry.enrolledSubjects.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {entry.enrolledSubjects.map((subject) => (
-                          <Badge key={subject} variant="outline" className="text-[10px]">
+                          <Badge
+                            key={subject}
+                            variant="outline"
+                            className="border-[#A2D4ED] text-[10px] text-[#0047AB]"
+                          >
                             {subject}
                           </Badge>
                         ))}
                       </div>
                     )}
                     {entry.presentNowDetails.length > 0 && (
-                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
+                      <p className="text-[11px] text-emerald-800">
                         {entry.presentNowDetails.join(" · ")}
                       </p>
                     )}
                     {entry.alreadyMarkedDetails.length > 0 && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      <p className="text-[11px] text-amber-900">
                         {entry.alreadyMarkedDetails.join(" · ")}
                       </p>
                     )}
@@ -957,7 +976,7 @@ export function KioskAttendanceScreen({
                     <Badge variant="secondary" className="text-[10px]">
                       {entry.status}
                     </Badge>
-                    <p className="text-muted-foreground mt-1 font-mono text-[10px]">
+                    <p className="mt-1 font-mono text-[10px] text-[#0047AB]/60">
                       {entry.timeLabel}
                     </p>
                   </div>
@@ -990,8 +1009,8 @@ function StatusPill({
         loading
           ? "bg-white/10 text-white/70"
           : ok
-            ? "bg-emerald-500/20 text-emerald-300"
-            : "bg-amber-500/20 text-amber-200"
+            ? "bg-[#ABD2F2]/90 text-[#0047AB]"
+            : "bg-[#F9BF15]/25 text-[#F9BF15]"
       }`}
     >
       {loading ? <Loader2 className="size-3.5 animate-spin" /> : icon}

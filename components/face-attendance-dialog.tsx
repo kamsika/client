@@ -433,7 +433,7 @@ export function FaceAttendanceDialog({
                 Enrolled faces: {enrolledProfiles.length} / {profiles.length}
               </p>
               {enrolledProfiles.length === 0 && (
-                <p className="text-amber-600">
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-sm text-amber-900">
                   No enrolled faces yet. Switch to Enroll Face and register students first.
                 </p>
               )}

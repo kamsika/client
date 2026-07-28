@@ -21,6 +21,10 @@ import { listStudents } from "@/services/student"
 import { saveStudentFace } from "@/services/student-face"
 import type { Student } from "@/types"
 
+const outlineBtn = "border-[#A2D4ED] text-[#0047AB] hover:bg-[#ABD2F2]/40"
+const primaryBtn =
+  "gap-2 bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
+
 export function StudentFaceRegistration() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const frameRef = useRef<HTMLDivElement>(null)
@@ -214,13 +218,13 @@ export function StudentFaceRegistration() {
     : null
 
   return (
-    <Card>
+    <Card className="border-[#A2D4ED]/60 shadow-[0_12px_40px_rgba(5,8,46,0.05)]">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-[#05082E]">
           <ScanFace className="size-5" />
           Student Face Registration
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-[#0047AB]/75">
           Select a student, capture their face from the webcam, and save the 128-element face
           descriptor for recognition attendance.
         </CardDescription>
@@ -293,6 +297,7 @@ export function StudentFaceRegistration() {
             <Button
               type="button"
               variant="outline"
+              className={outlineBtn}
               disabled={modelsLoading || cameraStarting}
               onClick={() => void handleEnableCamera()}
             >
@@ -307,6 +312,7 @@ export function StudentFaceRegistration() {
             </Button>
             <Button
               type="button"
+              className={primaryBtn}
               disabled={!cameraActive || !selectedId}
               onClick={() => void handleCaptureFace()}
             >
@@ -314,6 +320,7 @@ export function StudentFaceRegistration() {
             </Button>
             <Button
               type="button"
+              className={primaryBtn}
               disabled={
                 saving ||
                 !selectedId ||
@@ -349,7 +356,7 @@ export function StudentFaceRegistration() {
         <div className="space-y-3">
           <div
             ref={frameRef}
-            className="relative min-h-[280px] overflow-hidden rounded-lg border bg-black"
+            className="relative min-h-[280px] overflow-hidden rounded-lg border border-[#A2D4ED]/50 bg-black"
           >
             <video
               ref={videoRef}
@@ -360,10 +367,10 @@ export function StudentFaceRegistration() {
 
             {overlayStyle && (
               <div
-                className="pointer-events-none absolute rounded-md border-2 border-emerald-400 shadow-[0_0_0_1px_rgba(16,185,129,0.4)]"
+                className="pointer-events-none absolute rounded-md border-2 border-[#A2D4ED] shadow-[0_0_0_1px_rgba(162,212,237,0.5)]"
                 style={overlayStyle}
               >
-                <span className="absolute -top-6 left-0 rounded bg-emerald-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <span className="absolute -top-6 left-0 rounded bg-[#0047AB] px-1.5 py-0.5 text-[10px] font-medium text-white">
                   Face detected
                 </span>
               </div>
@@ -391,7 +398,7 @@ export function StudentFaceRegistration() {
 
           <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block size-2.5 rounded-full bg-emerald-500" />
+              <span className="inline-block size-2.5 rounded-full bg-[#0047AB]" />
               Green box = valid face detected
             </span>
             <span>

@@ -197,11 +197,11 @@ export function drawFaceOverlays(
     const matched = detection.matched ?? false
 
     if (alreadyMarked) {
-      ctx.strokeStyle = "#38bdf8"
+      ctx.strokeStyle = "#0047AB"
     } else if (matched) {
-      ctx.strokeStyle = "#22c55e"
+      ctx.strokeStyle = "#0047AB"
     } else {
-      ctx.strokeStyle = "#facc15"
+      ctx.strokeStyle = "#F9BF15"
     }
     ctx.lineWidth = Math.max(3, Math.round(width / 320))
     ctx.strokeRect(x, y, boxW, boxH)
@@ -212,14 +212,14 @@ export function drawFaceOverlays(
       const textWidth = ctx.measureText(detection.label).width
       const labelH = Math.max(22, Math.round(width / 28))
       if (alreadyMarked) {
-        ctx.fillStyle = "rgba(14, 165, 233, 0.92)"
+        ctx.fillStyle = "rgba(0, 71, 171, 0.92)"
       } else if (matched) {
-        ctx.fillStyle = "rgba(34, 197, 94, 0.9)"
+        ctx.fillStyle = "rgba(0, 71, 171, 0.9)"
       } else {
-        ctx.fillStyle = "rgba(250, 204, 21, 0.9)"
+        ctx.fillStyle = "rgba(249, 191, 21, 0.92)"
       }
       ctx.fillRect(x, Math.max(0, y - labelH), textWidth + padding * 2, labelH)
-      ctx.fillStyle = alreadyMarked ? "#082f49" : matched ? "#052e16" : "#422006"
+      ctx.fillStyle = alreadyMarked ? "#ffffff" : matched ? "#ffffff" : "#05082E"
       ctx.fillText(detection.label, x + padding, Math.max(labelH - 6, y - 6))
     }
   }

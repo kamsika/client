@@ -29,7 +29,7 @@ export const FaceCamera = forwardRef<FaceCameraHandle, FaceCameraProps>(function
   }))
 
   return (
-    <div className={cn("relative min-h-[280px] overflow-hidden rounded-lg border bg-black", className)}>
+    <div className={cn("relative min-h-[280px] overflow-hidden rounded-lg border border-[#A2D4ED]/50 bg-black", className)}>
       <video ref={videoRef} className="min-h-[280px] w-full object-cover" muted playsInline />
 
       {overlay}
@@ -48,7 +48,7 @@ export const FaceCamera = forwardRef<FaceCameraHandle, FaceCameraProps>(function
       )}
 
       {error && (
-        <div className="absolute inset-x-0 bottom-0 bg-red-950/85 px-3 py-2 text-center text-xs text-red-100">
+        <div className="absolute inset-x-0 bottom-0 border-t border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-xs text-destructive">
           {error}
         </div>
       )}

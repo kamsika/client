@@ -50,17 +50,22 @@ export function FaceRecognitionSettingsPanel({ onChange }: FaceRecognitionSettin
           <Settings2 className="size-5 text-[#0047AB]" />
           Face Recognition Settings
         </CardTitle>
-        <CardDescription>Stored locally in this browser for the teacher kiosk.</CardDescription>
+        <CardDescription className="text-[#0047AB]/75">
+          Stored locally in this browser for the teacher kiosk.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="face-threshold">Recognition threshold (lower = stricter)</Label>
+          <Label htmlFor="face-threshold" className="text-[#05082E]">
+            Recognition threshold (lower = stricter)
+          </Label>
           <Input
             id="face-threshold"
             type="number"
             min={0.2}
             max={1.2}
             step={0.05}
+            className="border-[#A2D4ED] focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40"
             value={settings.recognitionThreshold}
             onChange={(event) =>
               update({ recognitionThreshold: Number(event.target.value) || DEFAULT_FACE_SETTINGS.recognitionThreshold })
@@ -69,10 +74,12 @@ export function FaceRecognitionSettingsPanel({ onChange }: FaceRecognitionSettin
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="face-camera">Camera selection</Label>
+          <Label htmlFor="face-camera" className="text-[#05082E]">
+            Camera selection
+          </Label>
           <select
             id="face-camera"
-            className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
+            className="border-[#A2D4ED] bg-background focus-visible:border-[#ABD2F2] focus-visible:ring-[#A2D4ED]/40 h-10 w-full rounded-md border px-3 text-sm text-[#05082E]"
             value={settings.cameraDeviceId}
             onChange={(event) => update({ cameraDeviceId: event.target.value })}
           >
@@ -107,7 +114,12 @@ export function FaceRecognitionSettingsPanel({ onChange }: FaceRecognitionSettin
           />
         </div>
 
-        <Button type="button" variant="outline" onClick={() => update({ ...DEFAULT_FACE_SETTINGS })}>
+        <Button
+          type="button"
+          variant="outline"
+          className="border-[#A2D4ED] text-[#0047AB] hover:bg-[#ABD2F2]/40"
+          onClick={() => update({ ...DEFAULT_FACE_SETTINGS })}
+        >
           Reset defaults
         </Button>
       </CardContent>
