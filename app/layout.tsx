@@ -2,6 +2,7 @@ import { Geist_Mono, Inter } from "next/font/google"
 import Script from "next/script"
 
 import "./globals.css"
+import { TenantProvider } from "@/components/tenant-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
@@ -47,7 +48,7 @@ export default function RootLayout({
           {themeInitScript}
         </Script>
         <ThemeProvider>
-          {children}
+          <TenantProvider>{children}</TenantProvider>
           <Toaster richColors />
         </ThemeProvider>
       </body>
