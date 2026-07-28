@@ -48,6 +48,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getApiErrorMessage } from "@/lib/api-errors"
+import { buildTenantUrl } from "@/lib/tenant"
 import { cn } from "@/lib/utils"
 import {
   createInstitution,
@@ -80,6 +82,41 @@ const CHART_COLORS = {
 const PAGE_SIZE = 8
 
 type StatusFilter = "all" | "Active" | "Suspended"
+
+/** Subdomain rules mirrored from the backend so errors surface before submit. */
+const RESERVED_SUBDOMAINS = new Set([
+  "www",
+  "api",
+  "app",
+  "admin",
+  "superadmin",
+  "super-admin",
+  "dashboard",
+  "auth",
+  "login",
+  "static",
+  "assets",
+  "cdn",
+  "mail",
+  "test",
+  "staging",
+  "preview",
+  "localhost",
+])
+
+function validateSubdomainInput(value: string): string | null {
+  const subdomain = value.trim().toLowerCase()
+  if (!subdomain) return "Subdomain is required"
+  if (/\s/.test(subdomain)) return "Subdomain cannot contain spaces"
+  if (subdomain.length < 2) return "Subdomain must be at least 2 characters"
+  if (subdomain.length > 63) return "Subdomain must be 63 characters or fewer"
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(subdomain)) {
+    return "Use lowercase letters, numbers, and hyphens only (cannot start or end with a hyphen)"
+  }
+  if (subdomain.includes("--")) return "Subdomain cannot contain consecutive hyphens"
+  if (RESERVED_SUBDOMAINS.has(subdomain)) return "This subdomain is reserved. Choose another one."
+  return null
+}
 
 function formatWhen(value?: string) {
   if (!value) return "—"
@@ -230,10 +267,17 @@ export function SuperAdminDashboard() {
     const { name, subdomain, admin_name, admin_email, admin_phone } = institutionForm
     const errors: { name?: string; subdomain?: string } = {}
     if (!name) errors.name = "Institution name is required"
-    if (!subdomain) errors.subdomain = "Subdomain is required"
-    else if (!/^[a-z0-9-]+$/.test(subdomain)) {
-      errors.subdomain = "Use lowercase letters, numbers, and hyphens only"
+
+    const subdomainError = validateSubdomainInput(subdomain)
+    if (subdomainError) errors.subdomain = subdomainError
+
+    const duplicate = institutions.some(
+      (item) => item.subdomain.toLowerCase() === subdomain.trim().toLowerCase(),
+    )
+    if (!errors.subdomain && duplicate) {
+      errors.subdomain = "Subdomain already exists"
     }
+
     setFormErrors(errors)
     if (Object.keys(errors).length > 0) {
       toast.error(errors.name || errors.subdomain || "Please fix the form errors")
@@ -262,8 +306,13 @@ export function SuperAdminDashboard() {
       setCreatedCredentials(result.admin_credentials)
       setCredentialsOpen(true)
       void loadData()
-    } catch {
-      toast.error("Failed to create institution. Subdomain or email may already exist.")
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Failed to create institution. Subdomain or email may already exist.",
+        ),
+      )
     } finally {
       setCreatingInstitution(false)
     }
@@ -327,13 +376,24 @@ export function SuperAdminDashboard() {
               onChange={(e) =>
                 setInstitutionForm({
                   ...institutionForm,
-                  subdomain: e.target.value.toLowerCase(),
+                  subdomain: e.target.value.toLowerCase().trim(),
                 })
               }
             />
             {formErrors.subdomain ? (
               <p className="text-destructive text-sm">{formErrors.subdomain}</p>
-            ) : null}
+            ) : institutionForm.subdomain ? (
+              <p className="truncate text-xs text-[#0047AB]/70">
+                Dashboard URL:{" "}
+                <span className="font-medium text-[#05082E]">
+                  {buildTenantUrl(institutionForm.subdomain)}
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-[#0047AB]/60">
+                Lowercase letters, numbers, and hyphens only. Used as the institution&apos;s URL.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label className="text-[#05082E]">Admin Full Name (optional)</Label>
@@ -802,7 +862,15 @@ export function SuperAdminDashboard() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 font-mono text-xs text-[#0047AB]">
-                        {inst.subdomain}
+                        <a
+                          href={buildTenantUrl(inst.subdomain) || `/?tenant=${inst.subdomain}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={`Open ${inst.name} dashboard`}
+                          className="transition hover:text-[#00AAE4] hover:underline"
+                        >
+                          {inst.subdomain}
+                        </a>
                       </td>
                       <td className="px-5 py-3.5 text-[#0047AB]/80">
                         {formatWhen(inst.created_at)}
