@@ -3,47 +3,67 @@ import { NextResponse, type NextRequest } from "next/server"
 import {
   TENANT_COOKIE,
   TENANT_HEADER,
-  TENANT_QUERY_PARAM,
   extractSubdomain,
+  extractTenantFromPath,
+  isPlatformPublicPath,
+  isUnprefixedAppPath,
   normalizeSubdomain,
+  resolveTenantRestPath,
+  withTenantPrefix,
 } from "@/lib/tenant"
 
 /**
- * Detects the institution subdomain for every request and forwards it as the
- * `x-tenant` header plus a host-scoped cookie. Routing is untouched: pages and
- * APIs behave exactly as before, they simply gain tenant context.
+ * Path-based multi-tenancy on one origin:
+ *   /auth/login              — public login
+ *   /nec/dashboard           — institution workspace (rewritten internally)
+ *   /nec/admin/students/...  — all institution routes under /{slug}/...
  *
- * Supported forms:
- *   kks.example.com           (production)
- *   kks.localhost:3000        (development)
- *   localhost:3000?tenant=kks (fallback when wildcard localhost is unavailable)
+ * Legacy `{slug}.localhost` hosts redirect to `localhost:PORT/{slug}/...`.
  */
 export function proxy(request: NextRequest) {
   const host = request.headers.get("host") || ""
   const { pathname, searchParams } = request.nextUrl
 
-  const fromHost = extractSubdomain(host)
-  const fromQuery = searchParams.has(TENANT_QUERY_PARAM)
-    ? normalizeSubdomain(searchParams.get(TENANT_QUERY_PARAM))
-    : null
-  const fromCookie = normalizeSubdomain(request.cookies.get(TENANT_COOKIE)?.value)
+  const legacySubdomain = extractSubdomain(host)
+  if (legacySubdomain) {
+    const url = request.nextUrl.clone()
+    const hostParts = url.host.split(":")
+    if (hostParts.length > 1) {
+      url.port = hostParts[1]
+    }
+    url.hostname = "localhost"
+    const suffix =
+      pathname === "/" ? `/${legacySubdomain}/dashboard` : `/${legacySubdomain}${pathname}`
+    url.pathname = suffix
+    return NextResponse.redirect(url)
+  }
 
-  // Super Admin is main-domain only, so a leftover fallback cookie must never
-  // put it into tenant context. A real subdomain still wins, which keeps the
-  // cross-tenant guards in charge there.
+  const fromCookie = normalizeSubdomain(request.cookies.get(TENANT_COOKIE)?.value)
   const isSuperAdminArea = pathname === "/superadmin" || pathname.startsWith("/superadmin/")
+  const isPublic = isPlatformPublicPath(pathname)
+
+  const { tenant: pathTenant, rest } = extractTenantFromPath(pathname)
+
+  if (pathTenant && rest === "/") {
+    const url = request.nextUrl.clone()
+    url.pathname = `/${pathTenant}/dashboard`
+    return NextResponse.redirect(url)
+  }
+
+  if (!pathTenant && !isPublic && !isSuperAdminArea && isUnprefixedAppPath(pathname) && fromCookie) {
+    const url = request.nextUrl.clone()
+    url.pathname = withTenantPrefix(pathname, fromCookie)
+    return NextResponse.redirect(url)
+  }
 
   let tenant = ""
-  if (fromHost) {
-    tenant = fromHost
-  } else if (isSuperAdminArea) {
+  if (pathTenant) {
+    tenant = pathTenant
+  } else if (isSuperAdminArea || isPublic) {
     tenant = ""
-  } else if (fromQuery !== null) {
-    // An explicit `?tenant=` (including an empty value, which exits the tenant).
-    tenant = fromQuery
+  } else if (searchParams.has("tenant")) {
+    tenant = normalizeSubdomain(searchParams.get("tenant"))
   } else {
-    // Sticky fallback: the query param only appears on the first navigation, so
-    // the cookie is what keeps `localhost:3000` in tenant context afterwards.
     tenant = fromCookie
   }
 
@@ -54,14 +74,17 @@ export function proxy(request: NextRequest) {
     requestHeaders.delete(TENANT_HEADER)
   }
 
-  // A tenant host is an institution workspace, not the public marketing site.
-  const response =
-    tenant && pathname === "/"
-      ? NextResponse.redirect(new URL("/admin/dashboard", request.url))
-      : NextResponse.next({ request: { headers: requestHeaders } })
+  let response: NextResponse
 
-  // Host-scoped cookie: each subdomain keeps its own value, so tenants can never
-  // read each other's context.
+  if (pathTenant) {
+    const internalPath = resolveTenantRestPath(rest)
+    const rewriteUrl = request.nextUrl.clone()
+    rewriteUrl.pathname = internalPath
+    response = NextResponse.rewrite(rewriteUrl, { request: { headers: requestHeaders } })
+  } else {
+    response = NextResponse.next({ request: { headers: requestHeaders } })
+  }
+
   if (tenant) {
     if (tenant !== fromCookie) {
       response.cookies.set(TENANT_COOKIE, tenant, {
@@ -69,7 +92,7 @@ export function proxy(request: NextRequest) {
         sameSite: "lax",
       })
     }
-  } else if (fromCookie) {
+  } else if (fromCookie && (isPublic || isSuperAdminArea)) {
     response.cookies.delete(TENANT_COOKIE)
   }
 

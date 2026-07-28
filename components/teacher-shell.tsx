@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { getClientTenant, stripTenantPrefix, withTenantPrefix } from "@/lib/tenant"
 import { getTeacherNav, type TeacherNavItem } from "@/lib/teacher-nav"
 import { cn } from "@/lib/utils"
 import { fetchCurrentUser, logout } from "@/services/auth"
@@ -37,8 +38,9 @@ interface TeacherShellProps {
 }
 
 function isNavActive(pathname: string, item: TeacherNavItem) {
-  if (item.exact) return pathname === item.href
-  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  const logical = stripTenantPrefix(pathname)
+  if (item.exact) return logical === item.href
+  return logical === item.href || logical.startsWith(`${item.href}/`)
 }
 
 export function TeacherShell({
@@ -54,6 +56,7 @@ export function TeacherShell({
   const [collapsed, setCollapsed] = useState(false)
 
   const navItems = getTeacherNav()
+  const tenantSlug = getClientTenant()
   const activeItem = navItems.find((item) => isNavActive(pathname, item))
   const pageTitle = title || activeItem?.label || "Teacher Dashboard"
   const pageDescription =
@@ -78,7 +81,11 @@ export function TeacherShell({
         if (cancelled) return
 
         if (currentUser.role !== "teacher") {
-          router.replace(getDashboardPath(currentUser.role))
+          router.replace(
+            getDashboardPath(currentUser.role, {
+              tenant: currentUser.institution?.subdomain || tenantSlug || undefined,
+            }),
+          )
           return
         }
 
@@ -137,7 +144,7 @@ export function TeacherShell({
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={withTenantPrefix(item.href, tenantSlug)}
               title={compact ? item.label : undefined}
               className={cn(
                 "group flex items-center gap-3 rounded-xl transition duration-200",

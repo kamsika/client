@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { getClientTenant } from "@/lib/tenant"
 import type { User } from "@/types"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     // Teachers and other non-admin roles cannot access /admin routes.
     if (user.role !== "super_admin" && user.role !== "institution_admin") {
-      router.replace(getDashboardPath(user.role))
+      const tenant = getClientTenant()
+      router.replace(
+        getDashboardPath(user.role, {
+          tenant: user.institution?.subdomain || tenant || undefined,
+        }),
+      )
     }
   }, [pathname, router])
 

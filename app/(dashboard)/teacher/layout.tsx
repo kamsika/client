@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { getClientTenant, withTenantPrefix } from "@/lib/tenant"
 import type { User } from "@/types"
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     }
 
     if (user.role !== "teacher") {
-      router.replace(getDashboardPath(user.role))
+      router.replace(
+        getDashboardPath(user.role, {
+          tenant: user.institution?.subdomain || getClientTenant() || undefined,
+        }),
+      )
     }
   }, [pathname, router])
 

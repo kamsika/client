@@ -1,6 +1,6 @@
 import axios from "axios"
 
-import { TENANT_HANDOFF_PARAM, TENANT_HEADER, getClientTenant } from "@/lib/tenant"
+import { TENANT_HANDOFF_PARAM, TENANT_HEADER, getClientTenant, withTenantPrefix } from "@/lib/tenant"
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
 const API_BASE_URL = (configuredApiUrl || "http://localhost:5000").replace(/\/+$/, "")
@@ -104,18 +104,33 @@ export function consumeAuthHandoff(): boolean {
   }
 }
 
-export function getDashboardPath(role: string): string {
+export function getDashboardPath(
+  role: string,
+  options?: { tenant?: string },
+): string {
+  let path: string
   switch (role) {
     case "super_admin":
+      path = "/admin/dashboard"
+      break
     case "institution_admin":
-      return "/admin/dashboard"
+      path = options?.tenant ? "/dashboard" : "/admin/dashboard"
+      break
     case "teacher":
-      return "/teacher/dashboard"
+      path = "/teacher/dashboard"
+      break
     case "student":
-      return "/student/dashboard"
+      path = "/student/dashboard"
+      break
     case "parent":
-      return "/parent/dashboard"
+      path = "/parent/dashboard"
+      break
     default:
       return "/auth/login"
   }
+
+  if (options?.tenant) {
+    return withTenantPrefix(path, options.tenant)
+  }
+  return path
 }

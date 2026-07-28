@@ -1,11 +1,4 @@
-import {
-  apiClient,
-  clearAuth,
-  encodeAuthHandoff,
-  getDashboardPath,
-  storeAuth,
-} from "@/lib/api-client"
-import { buildTenantRedirect } from "@/lib/tenant"
+import { apiClient, clearAuth, getDashboardPath, storeAuth } from "@/lib/api-client"
 import type { AuthResponse, User } from "@/types"
 
 export async function login(email: string, password: string) {
@@ -32,33 +25,14 @@ export function redirectByRole(role: string) {
   window.location.href = getDashboardPath(role)
 }
 
-/**
- * Destination after a successful login.
- *
- * Institution users are sent to their own subdomain
- * (`https://kks.example.com/admin/dashboard`), carrying the session across the
- * origin boundary. Super Admins stay on the main domain, and anyone already on
- * the correct subdomain just navigates client-side as before.
- */
+/** Destination after login — institution users go to `/{slug}/dashboard` on the same origin. */
 export function resolveLoginRedirect(auth: AuthResponse): {
   url: string
   crossOrigin: boolean
 } {
-  const path = getDashboardPath(auth.user.role)
-
-  if (auth.user.role === "super_admin") {
-    return { url: path, crossOrigin: false }
-  }
-
   const subdomain = auth.user.institution?.subdomain
-  if (!subdomain) {
-    return { url: path, crossOrigin: false }
-  }
-
-  const handoff = encodeAuthHandoff(auth.access_token, auth.user)
-  const url = buildTenantRedirect(subdomain, path, handoff)
-
-  return { url, crossOrigin: url.startsWith("http") }
+  const url = getDashboardPath(auth.user.role, subdomain ? { tenant: subdomain } : undefined)
+  return { url, crossOrigin: false }
 }
 
 export async function registerInstitution(payload: {

@@ -863,7 +863,7 @@ export function SuperAdminDashboard() {
                       </td>
                       <td className="px-5 py-3.5 font-mono text-xs text-[#0047AB]">
                         <a
-                          href={buildTenantUrl(inst.subdomain) || `/?tenant=${inst.subdomain}`}
+                          href={buildTenantUrl(inst.subdomain, "/dashboard")}
                           target="_blank"
                           rel="noreferrer"
                           title={`Open ${inst.name} dashboard`}

@@ -1,5 +1,6 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import { createContext, useContext, useEffect, useMemo, useState } from "react"
 
 import { TenantStatusScreen } from "@/components/tenant-status-screen"
@@ -46,6 +47,7 @@ export function useTenant() {
 consumeAuthHandoff()
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   const [subdomain, setSubdomain] = useState("")
   const [resolution, setResolution] = useState<TenantResolution | null>(null)
   const [loading, setLoading] = useState(false)
@@ -73,7 +75,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [pathname])
 
   const value = useMemo<TenantContextValue>(() => {
     const institution = resolution?.institution ?? null

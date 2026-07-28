@@ -39,7 +39,7 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
 
   return [
     {
-      href: "/admin/dashboard",
+      href: "/dashboard",
       label: "Dashboard",
       description: "Overview & management",
       icon: LayoutDashboard,

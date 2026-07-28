@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useTenant } from "@/components/tenant-provider"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { getClientTenant, stripTenantPrefix, withTenantPrefix } from "@/lib/tenant"
 import { cn } from "@/lib/utils"
 import { fetchCurrentUser, logout } from "@/services/auth"
 import type { User } from "@/types"
@@ -49,8 +50,9 @@ interface InstitutionAdminShellProps {
 }
 
 function isNavActive(pathname: string, item: InstitutionAdminNavItem) {
-  if (item.exact) return pathname === item.href
-  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  const logical = stripTenantPrefix(pathname)
+  if (item.exact) return logical === item.href
+  return logical === item.href || logical.startsWith(`${item.href}/`)
 }
 
 export function InstitutionAdminShell({
@@ -65,6 +67,7 @@ export function InstitutionAdminShell({
   const pathname = usePathname()
   const { setTheme } = useTheme()
   const tenant = useTenant()
+  const tenantSlug = tenant.subdomain || getClientTenant()
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -88,7 +91,11 @@ export function InstitutionAdminShell({
         if (cancelled) return
 
         if (!allowedRoles.includes(currentUser.role)) {
-          router.replace(getDashboardPath(currentUser.role))
+          router.replace(
+            getDashboardPath(currentUser.role, {
+              tenant: currentUser.institution?.subdomain || tenantSlug || undefined,
+            }),
+          )
           return
         }
 
@@ -151,7 +158,7 @@ export function InstitutionAdminShell({
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={withTenantPrefix(item.href, tenantSlug)}
               title={compact ? item.label : undefined}
               className={cn(
                 "group flex items-center gap-3 rounded-xl transition duration-200",

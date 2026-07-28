@@ -9,6 +9,7 @@ import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
+import { getClientTenant, stripTenantPrefix, withTenantPrefix } from "@/lib/tenant"
 import { fetchCurrentUser, logout } from "@/services/auth"
 import type { User } from "@/types"
 
@@ -29,8 +30,9 @@ interface DashboardShellProps {
 }
 
 function isNavActive(pathname: string, item: DashboardNavItem) {
-  if (item.exact) return pathname === item.href
-  return pathname === item.href || pathname.startsWith(`${item.href}/`)
+  const logical = stripTenantPrefix(pathname)
+  if (item.exact) return logical === item.href
+  return logical === item.href || logical.startsWith(`${item.href}/`)
 }
 
 export function DashboardShell({
@@ -44,6 +46,7 @@ export function DashboardShell({
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const [user, setUser] = useState<User | null>(null)
+  const tenantSlug = getClientTenant()
 
   useEffect(() => {
     let cancelled = false
@@ -60,7 +63,11 @@ export function DashboardShell({
         if (cancelled) return
 
         if (!allowedRoles.includes(currentUser.role)) {
-          router.replace(getDashboardPath(currentUser.role))
+          router.replace(
+            getDashboardPath(currentUser.role, {
+              tenant: currentUser.institution?.subdomain || tenantSlug || undefined,
+            }),
+          )
           return
         }
 
@@ -120,7 +127,7 @@ export function DashboardShell({
                 {navItems.map((item) => {
                   const active = isNavActive(pathname, item)
                   return (
-                    <Link key={item.href} href={item.href}>
+                    <Link key={item.href} href={withTenantPrefix(item.href, tenantSlug)}>
                       <Button variant={active ? "default" : "ghost"} size="sm">
                         {item.label}
                       </Button>
@@ -135,7 +142,7 @@ export function DashboardShell({
                 const Icon = item.icon
                 const active = isNavActive(pathname, item)
                 return (
-                  <Link key={item.href} href={item.href}>
+                  <Link key={item.href} href={withTenantPrefix(item.href, tenantSlug)}>
                     <Button variant={active ? "default" : "ghost"} size="sm">
                       {Icon ? <Icon className="size-4" aria-hidden /> : null}
                       {item.label}
@@ -155,6 +162,7 @@ export function DashboardShell({
 export function useRequireAuth(allowedRoles: string[]) {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const tenantSlug = getClientTenant()
 
   useEffect(() => {
     let cancelled = false
@@ -171,7 +179,11 @@ export function useRequireAuth(allowedRoles: string[]) {
         if (cancelled) return
 
         if (!allowedRoles.includes(currentUser.role)) {
-          router.replace(getDashboardPath(currentUser.role))
+          router.replace(
+            getDashboardPath(currentUser.role, {
+              tenant: currentUser.institution?.subdomain || tenantSlug || undefined,
+            }),
+          )
           return
         }
 
