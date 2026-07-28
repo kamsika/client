@@ -25,6 +25,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useTenant } from "@/components/tenant-provider"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import { fetchCurrentUser, logout } from "@/services/auth"
@@ -63,6 +64,7 @@ export function InstitutionAdminShell({
   const router = useRouter()
   const pathname = usePathname()
   const { setTheme } = useTheme()
+  const tenant = useTenant()
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -130,6 +132,10 @@ export function InstitutionAdminShell({
     .toUpperCase()
 
   const sidebarWidth = collapsed ? "w-[4.5rem]" : "w-64"
+
+  // Tenant branding: prefer the subdomain's institution, fall back to the
+  // signed-in user's institution so the main domain looks unchanged.
+  const institutionName = tenant.institutionName || user.institution?.name || null
 
   function renderNav(compact: boolean) {
     return (
@@ -205,7 +211,9 @@ export function InstitutionAdminShell({
         </span>
         {!opts.compact && (
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold tracking-tight text-[#05082E]">AHMS</p>
+            <p className="truncate text-sm font-bold tracking-tight text-[#05082E]">
+              {institutionName || "AHMS"}
+            </p>
             <p className="truncate text-[11px] text-[#0047AB]/65">Institution Admin</p>
           </div>
         )}
