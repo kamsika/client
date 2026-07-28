@@ -12,10 +12,9 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getDashboardPath } from "@/lib/api-client"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { cn } from "@/lib/utils"
-import { login } from "@/services/auth"
+import { login, resolveLoginRedirect } from "@/services/auth"
 
 const schema = z.object({
   // Allow generated admin emails (including uncommon TLDs) while still requiring @domain.
@@ -41,8 +40,13 @@ export default function LoginPage() {
     try {
       const data = await login(values.email.trim(), values.password)
       toast.success("Login successful")
-      const destination = getDashboardPath(data.user.role)
-      router.replace(destination)
+      const destination = resolveLoginRedirect(data)
+      if (destination.crossOrigin) {
+        // Leaving the current origin for the institution's subdomain.
+        window.location.replace(destination.url)
+        return
+      }
+      router.replace(destination.url)
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Invalid email or password"))
     }
