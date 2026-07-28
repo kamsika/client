@@ -12,7 +12,11 @@ export interface User {
 export interface Institution {
   id: number
   name: string
+  /** Alias of `name` returned by the tenant-aware API. */
+  institution_name?: string
+  institutionName?: string
   subdomain: string
+  logo?: string | null
   status: "Active" | "Suspended"
   created_at: string
 }
