@@ -50,6 +50,7 @@ export function FaceAttendanceDialog({
   const videoRef = useRef<HTMLVideoElement>(null)
   const markingRef = useRef(false)
   const recentMarksRef = useRef<Map<number, number>>(new Map())
+  const recognitionPausedUntilRef = useRef(0)
 
   const [mode, setMode] = useState<FaceMode>("mark")
   const [profiles, setProfiles] = useState<StudentFaceProfile[]>([])
@@ -99,6 +100,7 @@ export function FaceAttendanceDialog({
     setEnrollStudentId("")
     setPendingSelection(null)
     recentMarksRef.current.clear()
+    recognitionPausedUntilRef.current = 0
   }, [stopCameraTracks])
 
   useEffect(() => {
@@ -197,8 +199,11 @@ export function FaceAttendanceDialog({
     async (studentId: number, label: string) => {
       if (pendingSelection) return
       const now = Date.now()
+      if (now < recognitionPausedUntilRef.current) {
+        return
+      }
       const lastMarkedAt = recentMarksRef.current.get(studentId)
-      if (lastMarkedAt && now - lastMarkedAt < 4000) {
+      if (lastMarkedAt && now - lastMarkedAt < 7000) {
         return
       }
 
@@ -209,7 +214,8 @@ export function FaceAttendanceDialog({
           classroomId,
           timestamp: new Date().toISOString(),
         })
-        recentMarksRef.current.set(studentId, now)
+        recentMarksRef.current.set(studentId, Date.now())
+        recognitionPausedUntilRef.current = Date.now() + 7000
         setLastMatch(label)
         const attendanceOptions =
           result.attendanceOptions ?? result.attendance_options ?? []
@@ -234,15 +240,11 @@ export function FaceAttendanceDialog({
         const attendance = result.attendance ?? result.data
         if (!attendance) {
           toast.error(result.message || `Attendance was not recorded for ${label}`)
+          recentMarksRef.current.delete(studentId)
+          recognitionPausedUntilRef.current = 0
           return
         }
-        toast.success(
-          attendance.status === "Late"
-            ? `${label} marked late (${result.delta_minutes} min) — fee: ${paymentStatus ?? "Pending"}`
-            : attendance.status === "Absent"
-              ? `${label} marked absent — fee: ${paymentStatus ?? "Pending"}`
-              : `${label} marked ${attendance.status} · Monthly fee: ${paymentStatus ?? "Pending"}`,
-        )
+        toast.success("Attendance Recorded Successfully")
       } catch (error) {
         toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${label}`))
       } finally {
@@ -277,6 +279,9 @@ export function FaceAttendanceDialog({
     const interval = window.setInterval(async () => {
       const video = videoRef.current
       if (!video || markingRef.current) {
+        return
+      }
+      if (Date.now() < recognitionPausedUntilRef.current) {
         return
       }
 

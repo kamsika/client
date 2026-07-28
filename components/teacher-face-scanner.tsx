@@ -20,7 +20,7 @@ export function TeacherFaceScanner() {
     <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
       <div className={cn(cardShell, "overflow-hidden p-4")}>
         <KioskAttendanceScreen
-            cooldownMs={5000}
+            cooldownMs={7000}
             matchThreshold={settings.recognitionThreshold}
             autoAttendance={settings.autoAttendance}
             soundNotification={settings.soundNotification}

@@ -45,8 +45,8 @@ import { listFaceProfiles, type StudentFaceProfile } from "@/services/student-fa
 import type { Classroom } from "@/types"
 
 const DETECT_INTERVAL_MS = 300
-/** Default per-student cooldown between kiosk attendance triggers. */
-export const KIOSK_COOLDOWN_MS = 5000
+/** Default per-student cooldown between kiosk attendance triggers (5–10s pause). */
+export const KIOSK_COOLDOWN_MS = 7000
 const FEEDBACK_MS = 5500
 
 const primaryBtn =
@@ -149,6 +149,10 @@ export function KioskAttendanceScreen({
   const autoAttendanceRef = useRef(autoAttendance)
   const soundNotificationRef = useRef(soundNotification)
   const cameraDeviceIdRef = useRef(cameraDeviceId)
+  /** Until this timestamp, skip all face matching (camera preview stays on). */
+  const recognitionPausedUntilRef = useRef(0)
+
+  const [recognitionPausedUntil, setRecognitionPausedUntil] = useState(0)
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomId, setClassroomId] = useState<string>(
@@ -186,6 +190,8 @@ export function KioskAttendanceScreen({
     classroomIdRef.current = classroomId ? Number(classroomId) : null
     // New classroom = reset cooldown / feedback scope.
     recentDetectionsRef.current.clear()
+    recognitionPausedUntilRef.current = 0
+    setRecognitionPausedUntil(0)
     setLog([])
     setRecognized(null)
   }, [classroomId])
@@ -197,6 +203,17 @@ export function KioskAttendanceScreen({
     soundNotificationRef.current = soundNotification
     cameraDeviceIdRef.current = cameraDeviceId
   }, [cooldownMs, matchThreshold, autoAttendance, soundNotification, cameraDeviceId])
+
+  useEffect(() => {
+    if (!recognitionPausedUntil) return
+    const remaining = recognitionPausedUntil - Date.now()
+    if (remaining <= 0) {
+      setRecognitionPausedUntil(0)
+      return
+    }
+    const timer = window.setTimeout(() => setRecognitionPausedUntil(0), remaining)
+    return () => window.clearTimeout(timer)
+  }, [recognitionPausedUntil])
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(formatClock(new Date())), 1000)
@@ -328,13 +345,25 @@ export function KioskAttendanceScreen({
     setScanning(false)
     setRecognized(null)
     recentDetectionsRef.current.clear()
+    recognitionPausedUntilRef.current = 0
+    setRecognitionPausedUntil(0)
+  }
+
+  function pauseRecognitionAfterMark() {
+    const until = Date.now() + cooldownMsRef.current
+    recognitionPausedUntilRef.current = until
+    setRecognitionPausedUntil(until)
   }
 
   const recordMatch = useCallback(async (studentId: number, distance: number) => {
     const now = Date.now()
     const cooldownWindow = cooldownMsRef.current
 
-    // Per-student cooldown only — do NOT block the rest of the day.
+    if (now < recognitionPausedUntilRef.current) {
+      return
+    }
+
+    // Per-student cooldown — do NOT re-hit the API for the same student during the pause window.
     if (isWithinCooldown(recentDetectionsRef.current, studentId, now, cooldownWindow)) {
       return
     }
@@ -353,8 +382,6 @@ export function KioskAttendanceScreen({
     const name = profile?.label ?? `Student #${studentId}`
     const registrationNo = profile?.registrationNo ?? ""
 
-    recentDetectionsRef.current.set(studentId, now)
-    pruneRecentDetections(recentDetectionsRef.current, now, cooldownWindow)
     markingRef.current = true
 
     try {
@@ -408,10 +435,10 @@ export function KioskAttendanceScreen({
             : "Already marked for current class"
       } else if (newlyMarked.length > 0 && alreadyMarked.length > 0) {
         mode = "mixed"
-        statusLabel = `Present · ${newlyMarked.join(", ")}`
+        statusLabel = "Attendance Recorded Successfully"
       } else if (newlyMarked.length > 0) {
         mode = "present"
-        statusLabel = `Present · ${newlyMarked.join(", ")}`
+        statusLabel = "Attendance Recorded Successfully"
       }
 
       setRecognized({
@@ -441,6 +468,9 @@ export function KioskAttendanceScreen({
         toast.message(
           `${displayName}: no timetable class at this time. Enrolled subjects shown only.`,
         )
+        pauseRecognitionAfterMark()
+        recentDetectionsRef.current.set(studentId, Date.now())
+        pruneRecentDetections(recentDetectionsRef.current, Date.now(), cooldownWindow)
         return
       }
 
@@ -449,14 +479,22 @@ export function KioskAttendanceScreen({
           fallbackAlready[0] ||
             `Already marked for ${alreadyMarked.join(", ") || "current class"}.`,
         )
+        pauseRecognitionAfterMark()
+        recentDetectionsRef.current.set(studentId, Date.now())
+        pruneRecentDetections(recentDetectionsRef.current, Date.now(), cooldownWindow)
         return
       }
+
+      pauseRecognitionAfterMark()
+      recentDetectionsRef.current.set(studentId, Date.now())
+      pruneRecentDetections(recentDetectionsRef.current, Date.now(), cooldownWindow)
 
       if (soundNotificationRef.current) {
         playSuccessChime()
       }
+      toast.success("Attendance Recorded Successfully")
       if (newlyMarked.length > 0) {
-        toast.success(`Marked: ${newlyMarked.join(", ")}`)
+        toast.message(`Marked: ${newlyMarked.join(", ")}`)
       }
       if (alreadyMarked.length > 0) {
         toast.message(fallbackAlready.join(" "))
@@ -468,7 +506,7 @@ export function KioskAttendanceScreen({
           studentId,
           name: displayName,
           registrationNo: displayReg,
-          status: statusLabel,
+          status: mode === "present" || mode === "mixed" ? "Attendance Recorded Successfully" : statusLabel,
           timeLabel: formatClock(new Date()),
           distance,
           enrolledSubjects,
@@ -492,6 +530,9 @@ export function KioskAttendanceScreen({
           alreadyMarkedDetails: [message.endsWith(".") ? message : `${message}.`],
         })
         toast.message(message)
+        pauseRecognitionAfterMark()
+        recentDetectionsRef.current.set(studentId, Date.now())
+        pruneRecentDetections(recentDetectionsRef.current, Date.now(), cooldownWindow)
       } else {
         recentDetectionsRef.current.delete(studentId)
         toast.error(getApiErrorMessage(error, `Failed to mark ${name}`))
@@ -518,8 +559,11 @@ export function KioskAttendanceScreen({
       })
       const newlyMarked = result.newlyMarkedSubjects ?? []
       if (newlyMarked.length > 0) {
-        toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
+        toast.success("Attendance Recorded Successfully")
+        toast.message(`Marked Present: ${newlyMarked.join(", ")}`)
       }
+      pauseRecognitionAfterMark()
+      recentDetectionsRef.current.set(pendingSelection.studentId, Date.now())
       const attendance = result.attendance ?? result.data
       if (attendance) {
         setRecognized((current) =>
@@ -551,6 +595,12 @@ export function KioskAttendanceScreen({
       const canvas = canvasRef.current
       const matcher = matcherRef.current
       if (!video || !canvas || !matcher || cancelled || detectingRef.current) {
+        return
+      }
+
+      const now = Date.now()
+      if (now < recognitionPausedUntilRef.current) {
+        clearFaceOverlay(canvas)
         return
       }
 
@@ -614,7 +664,7 @@ export function KioskAttendanceScreen({
           isWithinCooldown(
             recentDetectionsRef.current,
             bestMatch.studentId,
-            Date.now(),
+            now,
             cooldownMsRef.current,
           )
         ) {
@@ -690,13 +740,22 @@ export function KioskAttendanceScreen({
               badLabel="No faces enrolled"
               icon={<ScanFace className="size-3.5" />}
             />
-            {scanning && cameraActive && (
+            {scanning && cameraActive && recognitionPausedUntil <= Date.now() && (
               <Badge
                 variant="outline"
                 className="gap-1.5 border-[#A2D4ED]/80 bg-[#ABD2F2]/90 text-[#0047AB]"
               >
                 <CircleDot className="size-3 animate-pulse" />
                 Scanning
+              </Badge>
+            )}
+            {recognitionPausedUntil > Date.now() && (
+              <Badge
+                variant="outline"
+                className="gap-1.5 border-emerald-200 bg-white/95 text-emerald-800"
+              >
+                <CheckCircle2 className="size-3.5" />
+                Attendance Recorded Successfully
               </Badge>
             )}
           </div>
