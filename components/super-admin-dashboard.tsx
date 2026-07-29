@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import {
   Building2,
@@ -15,6 +15,12 @@ import {
   Search,
   ShieldOff,
   Sparkles,
+  AlertTriangle,
+  CircleCheck,
+  GraduationCap,
+  HardDrive,
+  LogIn,
+  Users,
 } from "lucide-react"
 import {
   Bar,
@@ -35,7 +41,6 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
@@ -162,6 +167,90 @@ function SkeletonBlock({ className }: { className?: string }) {
         className,
       )}
     />
+  )
+}
+
+function ImpactListItem({
+  icon: Icon,
+  children,
+  tone = "amber",
+}: {
+  icon: ComponentType<{ className?: string }>
+  children: ReactNode
+  tone?: "amber" | "slate"
+}) {
+  return (
+    <li className="flex gap-2.5 text-sm leading-snug text-[#05082E]/90">
+      <span
+        className={cn(
+          "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md",
+          tone === "amber" ? "bg-amber-100/80 text-amber-800" : "bg-[#A2D4ED]/35 text-[#0047AB]",
+        )}
+      >
+        <Icon className="size-3.5" />
+      </span>
+      <span>{children}</span>
+    </li>
+  )
+}
+
+function TypedConfirmationField({
+  id,
+  expectedPhrase,
+  value,
+  onChange,
+  matched,
+  disabled,
+  examplePlaceholder,
+}: {
+  id: string
+  expectedPhrase: string
+  value: string
+  onChange: (value: string) => void
+  matched: boolean
+  disabled?: boolean
+  examplePlaceholder: string
+}) {
+  const showMismatch = value.trim().length > 0 && !matched
+  return (
+    <div className="space-y-2.5">
+      <Label htmlFor={id} className="text-sm leading-relaxed text-[#05082E]">
+        To confirm, please type{" "}
+        <span className="font-semibold text-[#0047AB]">{expectedPhrase}</span> below:
+      </Label>
+      <div className="relative">
+        <Input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={examplePlaceholder}
+          className={cn(
+            fieldClass,
+            "pr-10 transition-shadow focus-visible:border-[#0047AB]/40 focus-visible:ring-2 focus-visible:ring-[#0047AB]/20",
+            matched &&
+              "border-emerald-400/90 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-200/80",
+            showMismatch && "border-red-300/90 focus-visible:ring-red-100",
+          )}
+          disabled={disabled}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {matched ? (
+          <CircleCheck
+            className="pointer-events-none absolute top-1/2 right-3 size-5 -translate-y-1/2 text-emerald-600"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+      {showMismatch ? (
+        <p className="text-destructive text-xs">
+          Confirmation text does not match. Expected:{" "}
+          <span className="font-medium">{expectedPhrase}</span>
+        </p>
+      ) : matched ? (
+        <p className="text-xs font-medium text-emerald-700">Confirmation matched — you may proceed.</p>
+      ) : null}
+    </div>
   )
 }
 
@@ -1039,56 +1128,78 @@ export function SuperAdminDashboard() {
           if (!open) closeSuspendDialog()
         }}
       >
-        <AlertDialogContent className="border-[#A2D4ED]/60 bg-white sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#05082E]">Suspend Institution</AlertDialogTitle>
-            <AlertDialogDescription className="text-left text-sm text-[#0047AB]/85">
-              <span className="sr-only">
-                Confirm suspension of {suspendTarget?.name ?? "this institution"}
+        <AlertDialogContent className="gap-0 border-[#A2D4ED]/60 bg-white p-0 sm:max-w-xl">
+          <div className="border-b border-[#A2D4ED]/35 px-6 py-5">
+            <div className="flex items-start gap-4">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 ring-1 ring-amber-200/80">
+                <AlertTriangle className="size-5" />
               </span>
-            </AlertDialogDescription>
-            <div className="space-y-3 text-sm text-[#0047AB]/85">
-              <p>
-                Are you sure you want to suspend{" "}
-                <span className="font-semibold text-[#05082E]">
-                  {suspendTarget?.name ?? "this institution"}
-                </span>
-                ?
-              </p>
-              <p className="font-medium text-[#05082E]">After suspension:</p>
-              <ul className="list-disc space-y-1.5 pl-5">
-                <li>Institution Admin will not be able to log in.</li>
-                <li>Teachers will not be able to log in.</li>
-                <li>Students and institution users will temporarily lose access.</li>
-                <li>No data will be deleted.</li>
-                <li>The institution can be activated again later.</li>
-              </ul>
-              <div className="space-y-2 pt-1">
-                <Label htmlFor="suspend-confirm-input" className="text-[#05082E]">
-                  To confirm, type &apos;{suspendExpectedPhrase}&apos; in the box below:
-                </Label>
-                <Input
-                  id="suspend-confirm-input"
-                  value={suspendConfirmText}
-                  onChange={(e) => setSuspendConfirmText(e.target.value)}
-                  placeholder="Type confirmation message..."
-                  className={fieldClass}
-                  disabled={suspendDialogLoading}
-                  autoComplete="off"
-                />
-                {suspendConfirmText.trim() && !suspendPhraseMatched ? (
-                  <p className="text-destructive text-xs">
-                    Confirmation text does not match. Type exactly: {suspendExpectedPhrase}
-                  </p>
-                ) : null}
+              <div className="min-w-0 space-y-1.5">
+                <AlertDialogTitle className="text-lg font-semibold tracking-tight text-[#05082E]">
+                  Suspend Institution
+                </AlertDialogTitle>
+                <p className="text-sm text-[#0047AB]/80">
+                  Review the impact before suspending{" "}
+                  <span className="font-semibold text-[#05082E]">
+                    {suspendTarget?.name ?? "this institution"}
+                  </span>
+                  .
+                </p>
+                <Badge
+                  variant="outline"
+                  className="mt-1 border-amber-200/80 bg-amber-50/80 text-[11px] font-semibold tracking-wide text-amber-900 uppercase"
+                >
+                  High impact action
+                </Badge>
               </div>
             </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogDescription className="sr-only">
+              Confirm suspension of {suspendTarget?.name ?? "this institution"}
+            </AlertDialogDescription>
+          </div>
+
+          <div className="space-y-5 px-6 py-5">
+            <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 px-4 py-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-amber-900/90 uppercase">
+                After suspension
+              </p>
+              <ul className="space-y-3">
+                <ImpactListItem icon={LogIn} tone="amber">
+                  Institution Admin will not be able to log in.
+                </ImpactListItem>
+                <ImpactListItem icon={GraduationCap} tone="amber">
+                  Teachers will not be able to log in.
+                </ImpactListItem>
+                <ImpactListItem icon={Users} tone="amber">
+                  Students and institution users will temporarily lose access.
+                </ImpactListItem>
+                <ImpactListItem icon={HardDrive} tone="amber">
+                  No data will be deleted.
+                </ImpactListItem>
+                <ImpactListItem icon={RefreshCw} tone="amber">
+                  The institution can be activated again later.
+                </ImpactListItem>
+              </ul>
+            </div>
+
+            <TypedConfirmationField
+              id="suspend-confirm-input"
+              expectedPhrase={suspendExpectedPhrase}
+              value={suspendConfirmText}
+              onChange={setSuspendConfirmText}
+              matched={suspendPhraseMatched}
+              disabled={suspendDialogLoading}
+              examplePlaceholder={
+                suspendTarget ? `e.g., ${suspendConfirmationPhrase(suspendTarget.name)}` : "e.g., KKKM suspend"
+              }
+            />
+          </div>
+
+          <AlertDialogFooter className="flex justify-end gap-3 border-t border-[#A2D4ED]/30 bg-[#f8fbfe]/80 px-6 py-4">
             <Button
               type="button"
-              variant="outline"
-              className={outlineBtn}
+              variant="ghost"
+              className="text-[#0047AB] hover:bg-[#ABD2F2]/35 hover:text-[#05082E]"
               disabled={suspendDialogLoading}
               onClick={closeSuspendDialog}
             >
@@ -1096,7 +1207,10 @@ export function SuperAdminDashboard() {
             </Button>
             <Button
               type="button"
-              className="gap-2 bg-[#E88D1D] font-semibold text-white hover:bg-[#c67612]"
+              className={cn(
+                "gap-2 bg-[#c2410c] font-semibold text-white shadow-sm hover:bg-[#9a3412]",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
               disabled={suspendDialogLoading || !suspendPhraseMatched}
               onClick={() => void confirmSuspendInstitution()}
             >
@@ -1119,48 +1233,74 @@ export function SuperAdminDashboard() {
           if (!open) closeActivateDialog()
         }}
       >
-        <AlertDialogContent className="border-[#A2D4ED]/60 bg-white sm:max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-[#05082E]">Activate Institution</AlertDialogTitle>
-            <AlertDialogDescription className="text-left text-sm text-[#0047AB]/85">
-              <span className="sr-only">
-                Confirm activation of {activateTarget?.name ?? "this institution"}
+        <AlertDialogContent className="gap-0 border-[#A2D4ED]/60 bg-white p-0 sm:max-w-xl">
+          <div className="border-b border-[#A2D4ED]/35 px-6 py-5">
+            <div className="flex items-start gap-4">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/80">
+                <RefreshCw className="size-5" />
               </span>
-            </AlertDialogDescription>
-            <div className="space-y-3 text-sm text-[#0047AB]/85">
-              <p>
-                Are you sure you want to activate{" "}
-                <span className="font-semibold text-[#05082E]">
-                  {activateTarget?.name ?? "this institution"}
-                </span>
-                ? Institution admins, teachers, and users will be able to log in again.
-              </p>
-              <div className="space-y-2 pt-1">
-                <Label htmlFor="activate-confirm-input" className="text-[#05082E]">
-                  To confirm, type &apos;{activateExpectedPhrase}&apos; in the box below:
-                </Label>
-                <Input
-                  id="activate-confirm-input"
-                  value={activateConfirmText}
-                  onChange={(e) => setActivateConfirmText(e.target.value)}
-                  placeholder="Type confirmation message..."
-                  className={fieldClass}
-                  disabled={activateDialogLoading}
-                  autoComplete="off"
-                />
-                {activateConfirmText.trim() && !activatePhraseMatched ? (
-                  <p className="text-destructive text-xs">
-                    Confirmation text does not match. Type exactly: {activateExpectedPhrase}
-                  </p>
-                ) : null}
+              <div className="min-w-0 space-y-1.5">
+                <AlertDialogTitle className="text-lg font-semibold tracking-tight text-[#05082E]">
+                  Activate Institution
+                </AlertDialogTitle>
+                <p className="text-sm text-[#0047AB]/80">
+                  Restore access for{" "}
+                  <span className="font-semibold text-[#05082E]">
+                    {activateTarget?.name ?? "this institution"}
+                  </span>
+                  .
+                </p>
+                <Badge
+                  variant="outline"
+                  className="mt-1 border-emerald-200/80 bg-emerald-50/80 text-[11px] font-semibold tracking-wide text-emerald-900 uppercase"
+                >
+                  Restore access
+                </Badge>
               </div>
             </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogDescription className="sr-only">
+              Confirm activation of {activateTarget?.name ?? "this institution"}
+            </AlertDialogDescription>
+          </div>
+
+          <div className="space-y-5 px-6 py-5">
+            <div className="rounded-xl border border-[#A2D4ED]/50 bg-slate-50/90 px-4 py-4">
+              <p className="mb-3 text-xs font-semibold tracking-wide text-[#0047AB]/80 uppercase">
+                After activation
+              </p>
+              <ul className="space-y-3">
+                <ImpactListItem icon={LogIn} tone="slate">
+                  Institution admins can log in again.
+                </ImpactListItem>
+                <ImpactListItem icon={GraduationCap} tone="slate">
+                  Teachers can log in and use their dashboards.
+                </ImpactListItem>
+                <ImpactListItem icon={Users} tone="slate">
+                  Students, parents, and other users regain access.
+                </ImpactListItem>
+              </ul>
+            </div>
+
+            <TypedConfirmationField
+              id="activate-confirm-input"
+              expectedPhrase={activateExpectedPhrase}
+              value={activateConfirmText}
+              onChange={setActivateConfirmText}
+              matched={activatePhraseMatched}
+              disabled={activateDialogLoading}
+              examplePlaceholder={
+                activateTarget
+                  ? `e.g., ${activateConfirmationPhrase(activateTarget.name)}`
+                  : "e.g., KKKM activate"
+              }
+            />
+          </div>
+
+          <AlertDialogFooter className="flex justify-end gap-3 border-t border-[#A2D4ED]/30 bg-[#f8fbfe]/80 px-6 py-4">
             <Button
               type="button"
-              variant="outline"
-              className={outlineBtn}
+              variant="ghost"
+              className="text-[#0047AB] hover:bg-[#ABD2F2]/35 hover:text-[#05082E]"
               disabled={activateDialogLoading}
               onClick={closeActivateDialog}
             >
@@ -1168,7 +1308,10 @@ export function SuperAdminDashboard() {
             </Button>
             <Button
               type="button"
-              className={cn("gap-2", primaryBtn)}
+              className={cn(
+                "gap-2 bg-[#0047AB] font-semibold text-white shadow-sm hover:bg-[#003580]",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
               disabled={activateDialogLoading || !activatePhraseMatched}
               onClick={() => void confirmActivateInstitution()}
             >
