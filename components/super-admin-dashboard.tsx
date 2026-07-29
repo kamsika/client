@@ -92,6 +92,20 @@ const PAGE_SIZE = 8
 
 type StatusFilter = "all" | "Active" | "Suspended"
 
+type InstitutionActionTarget = { id: number; name: string }
+
+function suspendConfirmationPhrase(name: string) {
+  return `${name} suspend`
+}
+
+function activateConfirmationPhrase(name: string) {
+  return `${name} activate`
+}
+
+function confirmationMatches(input: string, expected: string) {
+  return input.trim().toLowerCase() === expected.trim().toLowerCase()
+}
+
 /** Subdomain rules mirrored from the backend so errors surface before submit. */
 const RESERVED_SUBDOMAINS = new Set([
   "www",
@@ -162,7 +176,10 @@ export function SuperAdminDashboard() {
   const [credentialsOpen, setCredentialsOpen] = useState(false)
   const [creatingInstitution, setCreatingInstitution] = useState(false)
   const [togglingId, setTogglingId] = useState<number | null>(null)
-  const [suspendTarget, setSuspendTarget] = useState<{ id: number; name: string } | null>(null)
+  const [suspendTarget, setSuspendTarget] = useState<InstitutionActionTarget | null>(null)
+  const [activateTarget, setActivateTarget] = useState<InstitutionActionTarget | null>(null)
+  const [suspendConfirmText, setSuspendConfirmText] = useState("")
+  const [activateConfirmText, setActivateConfirmText] = useState("")
   const [formErrors, setFormErrors] = useState<{ name?: string; subdomain?: string }>({})
   const [createdCredentials, setCreatedCredentials] =
     useState<InstitutionAdminCredentials | null>(null)
@@ -189,6 +206,27 @@ export function SuperAdminDashboard() {
   useEffect(() => {
     void loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (suspendTarget) {
+      setSuspendConfirmText("")
+    }
+  }, [suspendTarget])
+
+  useEffect(() => {
+    if (activateTarget) {
+      setActivateConfirmText("")
+    }
+  }, [activateTarget])
+
+  const suspendExpectedPhrase = suspendTarget
+    ? suspendConfirmationPhrase(suspendTarget.name)
+    : ""
+  const activateExpectedPhrase = activateTarget
+    ? activateConfirmationPhrase(activateTarget.name)
+    : ""
+  const suspendPhraseMatched = confirmationMatches(suspendConfirmText, suspendExpectedPhrase)
+  const activatePhraseMatched = confirmationMatches(activateConfirmText, activateExpectedPhrase)
 
   const stats = useMemo(() => {
     const active = institutions.filter((item) => item.status === "Active").length
@@ -261,12 +299,16 @@ export function SuperAdminDashboard() {
     [recentInstitutions],
   )
 
-  async function activateInstitution(id: number) {
+  async function confirmActivateInstitution() {
+    if (!activateTarget || !activatePhraseMatched) return
+    const { id } = activateTarget
     try {
       setTogglingId(id)
       const updated = await updateInstitutionStatus(id, "Active")
       setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)))
       toast.success("Institution activated successfully")
+      setActivateTarget(null)
+      setActivateConfirmText("")
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to activate institution"))
     } finally {
@@ -275,7 +317,7 @@ export function SuperAdminDashboard() {
   }
 
   async function confirmSuspendInstitution() {
-    if (!suspendTarget) return
+    if (!suspendTarget || !suspendPhraseMatched) return
     const { id } = suspendTarget
     try {
       setTogglingId(id)
@@ -283,6 +325,7 @@ export function SuperAdminDashboard() {
       setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)))
       toast.success("Institution suspended successfully")
       setSuspendTarget(null)
+      setSuspendConfirmText("")
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to suspend institution"))
     } finally {
@@ -291,6 +334,19 @@ export function SuperAdminDashboard() {
   }
 
   const suspendDialogLoading = suspendTarget !== null && togglingId === suspendTarget.id
+  const activateDialogLoading = activateTarget !== null && togglingId === activateTarget.id
+
+  function closeSuspendDialog() {
+    if (suspendDialogLoading) return
+    setSuspendTarget(null)
+    setSuspendConfirmText("")
+  }
+
+  function closeActivateDialog() {
+    if (activateDialogLoading) return
+    setActivateTarget(null)
+    setActivateConfirmText("")
+  }
 
   async function handleCreateInstitution() {
     const { name, subdomain, admin_name, admin_email, admin_phone } = institutionForm
@@ -925,16 +981,10 @@ export function SuperAdminDashboard() {
                             onClick={() =>
                               inst.status === "Active"
                                 ? setSuspendTarget({ id: inst.id, name: inst.name })
-                                : void activateInstitution(inst.id)
+                                : setActivateTarget({ id: inst.id, name: inst.name })
                             }
                           >
-                            {togglingId === inst.id && !suspendTarget ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : inst.status === "Active" ? (
-                              "Suspend"
-                            ) : (
-                              "Activate"
-                            )}
+                            {inst.status === "Active" ? "Suspend" : "Activate"}
                           </Button>
                         </div>
                       </td>
@@ -986,9 +1036,7 @@ export function SuperAdminDashboard() {
       <AlertDialog
         open={Boolean(suspendTarget)}
         onOpenChange={(open) => {
-          if (!open && !suspendDialogLoading) {
-            setSuspendTarget(null)
-          }
+          if (!open) closeSuspendDialog()
         }}
       >
         <AlertDialogContent className="border-[#A2D4ED]/60 bg-white sm:max-w-lg">
@@ -1015,6 +1063,25 @@ export function SuperAdminDashboard() {
                 <li>No data will be deleted.</li>
                 <li>The institution can be activated again later.</li>
               </ul>
+              <div className="space-y-2 pt-1">
+                <Label htmlFor="suspend-confirm-input" className="text-[#05082E]">
+                  To confirm, type &apos;{suspendExpectedPhrase}&apos; in the box below:
+                </Label>
+                <Input
+                  id="suspend-confirm-input"
+                  value={suspendConfirmText}
+                  onChange={(e) => setSuspendConfirmText(e.target.value)}
+                  placeholder="Type confirmation message..."
+                  className={fieldClass}
+                  disabled={suspendDialogLoading}
+                  autoComplete="off"
+                />
+                {suspendConfirmText.trim() && !suspendPhraseMatched ? (
+                  <p className="text-destructive text-xs">
+                    Confirmation text does not match. Type exactly: {suspendExpectedPhrase}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
@@ -1023,14 +1090,14 @@ export function SuperAdminDashboard() {
               variant="outline"
               className={outlineBtn}
               disabled={suspendDialogLoading}
-              onClick={() => setSuspendTarget(null)}
+              onClick={closeSuspendDialog}
             >
               Cancel
             </Button>
             <Button
               type="button"
               className="gap-2 bg-[#E88D1D] font-semibold text-white hover:bg-[#c67612]"
-              disabled={suspendDialogLoading}
+              disabled={suspendDialogLoading || !suspendPhraseMatched}
               onClick={() => void confirmSuspendInstitution()}
             >
               {suspendDialogLoading ? (
@@ -1040,6 +1107,78 @@ export function SuperAdminDashboard() {
                 </>
               ) : (
                 "Suspend Institution"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(activateTarget)}
+        onOpenChange={(open) => {
+          if (!open) closeActivateDialog()
+        }}
+      >
+        <AlertDialogContent className="border-[#A2D4ED]/60 bg-white sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#05082E]">Activate Institution</AlertDialogTitle>
+            <AlertDialogDescription className="text-left text-sm text-[#0047AB]/85">
+              <span className="sr-only">
+                Confirm activation of {activateTarget?.name ?? "this institution"}
+              </span>
+            </AlertDialogDescription>
+            <div className="space-y-3 text-sm text-[#0047AB]/85">
+              <p>
+                Are you sure you want to activate{" "}
+                <span className="font-semibold text-[#05082E]">
+                  {activateTarget?.name ?? "this institution"}
+                </span>
+                ? Institution admins, teachers, and users will be able to log in again.
+              </p>
+              <div className="space-y-2 pt-1">
+                <Label htmlFor="activate-confirm-input" className="text-[#05082E]">
+                  To confirm, type &apos;{activateExpectedPhrase}&apos; in the box below:
+                </Label>
+                <Input
+                  id="activate-confirm-input"
+                  value={activateConfirmText}
+                  onChange={(e) => setActivateConfirmText(e.target.value)}
+                  placeholder="Type confirmation message..."
+                  className={fieldClass}
+                  disabled={activateDialogLoading}
+                  autoComplete="off"
+                />
+                {activateConfirmText.trim() && !activatePhraseMatched ? (
+                  <p className="text-destructive text-xs">
+                    Confirmation text does not match. Type exactly: {activateExpectedPhrase}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className={outlineBtn}
+              disabled={activateDialogLoading}
+              onClick={closeActivateDialog}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className={cn("gap-2", primaryBtn)}
+              disabled={activateDialogLoading || !activatePhraseMatched}
+              onClick={() => void confirmActivateInstitution()}
+            >
+              {activateDialogLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Activating…
+                </>
+              ) : (
+                "Activate Institution"
               )}
             </Button>
           </AlertDialogFooter>
