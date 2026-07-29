@@ -30,6 +30,14 @@ import {
 import { toast } from "sonner"
 
 import { SuperAdminShell } from "@/components/super-admin-shell"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -154,6 +162,7 @@ export function SuperAdminDashboard() {
   const [credentialsOpen, setCredentialsOpen] = useState(false)
   const [creatingInstitution, setCreatingInstitution] = useState(false)
   const [togglingId, setTogglingId] = useState<number | null>(null)
+  const [suspendTarget, setSuspendTarget] = useState<{ id: number; name: string } | null>(null)
   const [formErrors, setFormErrors] = useState<{ name?: string; subdomain?: string }>({})
   const [createdCredentials, setCreatedCredentials] =
     useState<InstitutionAdminCredentials | null>(null)
@@ -252,18 +261,36 @@ export function SuperAdminDashboard() {
     [recentInstitutions],
   )
 
-  async function toggleStatus(id: number, status: "Active" | "Suspended") {
+  async function activateInstitution(id: number) {
     try {
       setTogglingId(id)
-      await updateInstitutionStatus(id, status)
-      toast.success("Institution status updated")
-      void loadData()
-    } catch {
-      toast.error("Failed to update status")
+      const updated = await updateInstitutionStatus(id, "Active")
+      setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)))
+      toast.success("Institution activated successfully")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to activate institution"))
     } finally {
       setTogglingId(null)
     }
   }
+
+  async function confirmSuspendInstitution() {
+    if (!suspendTarget) return
+    const { id } = suspendTarget
+    try {
+      setTogglingId(id)
+      const updated = await updateInstitutionStatus(id, "Suspended")
+      setInstitutions((prev) => prev.map((item) => (item.id === id ? updated : item)))
+      toast.success("Institution suspended successfully")
+      setSuspendTarget(null)
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to suspend institution"))
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const suspendDialogLoading = suspendTarget !== null && togglingId === suspendTarget.id
 
   async function handleCreateInstitution() {
     const { name, subdomain, admin_name, admin_email, admin_phone } = institutionForm
@@ -896,13 +923,12 @@ export function SuperAdminDashboard() {
                             disabled={togglingId === inst.id}
                             className={outlineBtn}
                             onClick={() =>
-                              void toggleStatus(
-                                inst.id,
-                                inst.status === "Active" ? "Suspended" : "Active",
-                              )
+                              inst.status === "Active"
+                                ? setSuspendTarget({ id: inst.id, name: inst.name })
+                                : void activateInstitution(inst.id)
                             }
                           >
-                            {togglingId === inst.id ? (
+                            {togglingId === inst.id && !suspendTarget ? (
                               <Loader2 className="size-3.5 animate-spin" />
                             ) : inst.status === "Active" ? (
                               "Suspend"
@@ -956,20 +982,84 @@ export function SuperAdminDashboard() {
           </div>
         </div>
       </div>
+
+      <AlertDialog
+        open={Boolean(suspendTarget)}
+        onOpenChange={(open) => {
+          if (!open && !suspendDialogLoading) {
+            setSuspendTarget(null)
+          }
+        }}
+      >
+        <AlertDialogContent className="border-[#A2D4ED]/60 bg-white sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-[#05082E]">Suspend Institution</AlertDialogTitle>
+            <AlertDialogDescription className="text-left text-sm text-[#0047AB]/85">
+              <span className="sr-only">
+                Confirm suspension of {suspendTarget?.name ?? "this institution"}
+              </span>
+            </AlertDialogDescription>
+            <div className="space-y-3 text-sm text-[#0047AB]/85">
+              <p>
+                Are you sure you want to suspend{" "}
+                <span className="font-semibold text-[#05082E]">
+                  {suspendTarget?.name ?? "this institution"}
+                </span>
+                ?
+              </p>
+              <p className="font-medium text-[#05082E]">After suspension:</p>
+              <ul className="list-disc space-y-1.5 pl-5">
+                <li>Institution Admin will not be able to log in.</li>
+                <li>Teachers will not be able to log in.</li>
+                <li>Students and institution users will temporarily lose access.</li>
+                <li>No data will be deleted.</li>
+                <li>The institution can be activated again later.</li>
+              </ul>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className={outlineBtn}
+              disabled={suspendDialogLoading}
+              onClick={() => setSuspendTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="gap-2 bg-[#E88D1D] font-semibold text-white hover:bg-[#c67612]"
+              disabled={suspendDialogLoading}
+              onClick={() => void confirmSuspendInstitution()}
+            >
+              {suspendDialogLoading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Suspending…
+                </>
+              ) : (
+                "Suspend Institution"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SuperAdminShell>
   )
 }
 
 function StatusBadge({ status }: { status: "Active" | "Suspended" }) {
+  const active = status === "Active"
   return (
     <Badge
       className={
-        status === "Active"
+        active
           ? "shrink-0 border-0 bg-[#A2D4ED]/40 text-[#0047AB]"
           : "shrink-0 border-0 bg-[#F9BF15]/25 text-[#E88D1D]"
       }
     >
-      {status}
+      {active ? "Active" : "Suspended"}
     </Badge>
   )
 }
