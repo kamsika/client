@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Building2,
   CheckCircle2,
@@ -143,6 +144,7 @@ function SkeletonBlock({ className }: { className?: string }) {
 }
 
 export function SuperAdminDashboard() {
+  const router = useRouter()
   const [institutions, setInstitutions] = useState<Institution[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -879,26 +881,36 @@ export function SuperAdminDashboard() {
                         <StatusBadge status={inst.status} />
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={togglingId === inst.id}
-                          className={outlineBtn}
-                          onClick={() =>
-                            void toggleStatus(
-                              inst.id,
-                              inst.status === "Active" ? "Suspended" : "Active",
-                            )
-                          }
-                        >
-                          {togglingId === inst.id ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : inst.status === "Active" ? (
-                            "Suspend"
-                          ) : (
-                            "Activate"
-                          )}
-                        </Button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={outlineBtn}
+                            onClick={() => router.push(`/admin/institutions/${inst.id}`)}
+                          >
+                            Open
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={togglingId === inst.id}
+                            className={outlineBtn}
+                            onClick={() =>
+                              void toggleStatus(
+                                inst.id,
+                                inst.status === "Active" ? "Suspended" : "Active",
+                              )
+                            }
+                          >
+                            {togglingId === inst.id ? (
+                              <Loader2 className="size-3.5 animate-spin" />
+                            ) : inst.status === "Active" ? (
+                              "Suspend"
+                            ) : (
+                              "Activate"
+                            )}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
