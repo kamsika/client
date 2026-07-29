@@ -6,7 +6,16 @@ export interface User {
   full_name: string
   phone_number: string | null
   is_active: boolean
+  last_login_at?: string | null
   institution?: Institution
+}
+
+export interface InstitutionNotificationSettings {
+  email_notifications: boolean
+  attendance_alerts: boolean
+  fee_reminder_alerts: boolean
+  exam_notifications: boolean
+  announcement_notifications: boolean
 }
 
 export interface Institution {
@@ -17,8 +26,22 @@ export interface Institution {
   institutionName?: string
   subdomain: string
   logo?: string | null
+  logo_url?: string | null
   status: "Active" | "Suspended"
   created_at: string
+  updated_at?: string | null
+  contact_email?: string | null
+  email?: string | null
+  phone?: string | null
+  phone_number?: string | null
+  address?: string | null
+  description?: string | null
+  primary_color?: string | null
+  secondary_color?: string | null
+  accent_color?: string | null
+  theme_preset?: string | null
+  notifications?: InstitutionNotificationSettings
+  notification_settings?: InstitutionNotificationSettings
 }
 
 export interface Classroom {

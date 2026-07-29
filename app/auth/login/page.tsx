@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { z } from "zod"
 import { toast } from "sonner"
 
@@ -14,7 +14,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { cn } from "@/lib/utils"
+import {
+  AHMS_DEFAULT_BRANDING,
+  brandingCssVariables,
+  brandingFromInstitution,
+  type InstitutionBranding,
+} from "@/lib/institution-branding"
+import { getClientTenant } from "@/lib/tenant"
 import { login, resolveLoginRedirect } from "@/services/auth"
+import { resolveTenant } from "@/services/tenant"
 
 const schema = z.object({
   // Allow generated admin emails (including uncommon TLDs) while still requiring @domain.
@@ -31,6 +39,24 @@ type FormData = z.infer<typeof schema>
 export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [tenantBranding, setTenantBranding] = useState<InstitutionBranding>({
+    ...AHMS_DEFAULT_BRANDING,
+  })
+  const [tenantName, setTenantName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const slug = getClientTenant()
+    if (!slug) return
+    void resolveTenant(slug).then((result) => {
+      if (result.institution) {
+        setTenantBranding(brandingFromInstitution(result.institution))
+        setTenantName(result.institution.name)
+      }
+    })
+  }, [])
+
+  const brandingStyle = brandingCssVariables(tenantBranding)
+  const loginLogo = tenantBranding.logoUrl || "/ahms-logo.png"
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
@@ -53,9 +79,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased">
+    <div
+      className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased"
+      style={brandingStyle}
+    >
       {/* Brand panel */}
-      <aside className="relative hidden w-[44%] overflow-hidden bg-[#05082E] text-white lg:flex lg:flex-col lg:justify-between lg:p-10 xl:w-[46%]">
+      <aside
+        className="relative hidden w-[44%] overflow-hidden text-white lg:flex lg:flex-col lg:justify-between lg:p-10 xl:w-[46%]"
+        style={{ backgroundColor: tenantBranding.primaryColor }}
+      >
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div className="absolute -top-24 right-0 size-80 rounded-full bg-[#00AAE4]/20 blur-3xl" />
           <div className="absolute bottom-0 left-[-20%] size-72 rounded-full bg-[#F9BF15]/15 blur-3xl" />
@@ -68,10 +100,10 @@ export default function LoginPage() {
         >
           <span className="flex size-11 overflow-hidden rounded-xl bg-white shadow-[0_0_18px_rgba(0,170,228,0.35)]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/ahms-logo.png" alt="AHMS" className="size-11 object-cover" />
+            <img src={loginLogo} alt={tenantName || "AHMS"} className="size-11 object-cover" />
           </span>
           <div className="leading-tight">
-            <p className="text-lg font-bold tracking-tight">AHMS</p>
+            <p className="text-lg font-bold tracking-tight">{tenantName || "AHMS"}</p>
             <p className="text-[11px] font-medium text-sky-200/70">Student Management System</p>
           </div>
         </Link>
@@ -114,10 +146,10 @@ export default function LoginPage() {
           <Link href="/" className="inline-flex items-center gap-2.5">
             <span className="flex size-10 overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-[#00AAE4]/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/ahms-logo.png" alt="AHMS" className="size-10 object-cover" />
+              <img src={loginLogo} alt={tenantName || "AHMS"} className="size-10 object-cover" />
             </span>
             <div className="leading-tight">
-              <p className="text-base font-bold text-[#05082E]">AHMS</p>
+              <p className="text-base font-bold text-[#05082E]">{tenantName || "AHMS"}</p>
               <p className="text-[10px] font-medium text-[#0047AB]/75">Student Management System</p>
             </div>
           </Link>
@@ -199,7 +231,8 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 disabled={form.formState.isSubmitting}
-                className="h-11 w-full bg-[#F9BF15] font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:bg-[#E88D1D] hover:text-white"
+                className="h-11 w-full font-semibold text-[#05082E] shadow-[0_8px_24px_rgba(249,191,21,0.35)] transition hover:opacity-95"
+                style={{ backgroundColor: tenantBranding.accentColor }}
               >
                 {form.formState.isSubmitting ? "Signing in…" : "Sign In"}
               </Button>

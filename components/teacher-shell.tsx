@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
 import { getClientTenant, stripTenantPrefix, withTenantPrefix } from "@/lib/tenant"
+import { useInstitutionBranding, useInstitutionBrandingStyle } from "@/hooks/use-institution-branding"
 import { getTeacherNav, type TeacherNavItem } from "@/lib/teacher-nav"
 import { cn } from "@/lib/utils"
 import { fetchCurrentUser, logout } from "@/services/auth"
@@ -57,6 +58,9 @@ export function TeacherShell({
 
   const navItems = getTeacherNav()
   const tenantSlug = getClientTenant()
+  const branding = useInstitutionBranding()
+  const brandingStyle = useInstitutionBrandingStyle()
+  const logoSrc = branding.logoUrl || "/ahms-logo.png"
   const activeItem = navItems.find((item) => isNavActive(pathname, item))
   const pageTitle = title || activeItem?.label || "Teacher Dashboard"
   const pageDescription =
@@ -150,9 +154,14 @@ export function TeacherShell({
                 "group flex items-center gap-3 rounded-xl transition duration-200",
                 compact ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
                 active
-                  ? "bg-[#ABD2F2]/55 text-[#0047AB] shadow-[0_0_0_1px_rgba(162,212,237,0.8)]"
+                  ? "text-white shadow-sm"
                   : "text-[#0047AB]/75 hover:bg-[#A2D4ED]/25 hover:text-[#05082E]",
               )}
+              style={
+                active
+                  ? { backgroundColor: "var(--brand-primary)", color: branding.secondaryColor }
+                  : undefined
+              }
             >
               {Icon ? (
                 <Icon
@@ -200,7 +209,7 @@ export function TeacherShell({
       >
         <span className="flex size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-[0_6px_18px_rgba(162,212,237,0.45)] ring-1 ring-[#A2D4ED]/60">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/ahms-logo.png" alt="AHMS" className="size-10 object-cover" />
+          <img src={logoSrc} alt="Institution" className="size-10 object-cover" />
         </span>
         {!opts.compact && (
           <div className="min-w-0">
@@ -264,7 +273,10 @@ export function TeacherShell({
   )
 
   return (
-    <div className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased">
+    <div
+      className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased"
+      style={brandingStyle}
+    >
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden

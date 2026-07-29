@@ -26,8 +26,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useTenant } from "@/components/tenant-provider"
+import { useInstitutionBranding, useInstitutionBrandingStyle } from "@/hooks/use-institution-branding"
 import { clearAuth, getDashboardPath, getStoredUser } from "@/lib/api-client"
 import { getClientTenant, stripTenantPrefix, withTenantPrefix } from "@/lib/tenant"
+import { brandingFromInstitution, cacheBranding } from "@/lib/institution-branding"
 import { cn } from "@/lib/utils"
 import { fetchCurrentUser, logout } from "@/services/auth"
 import type { User } from "@/types"
@@ -68,6 +70,9 @@ export function InstitutionAdminShell({
   const { setTheme } = useTheme()
   const tenant = useTenant()
   const tenantSlug = tenant.subdomain || getClientTenant()
+  const branding = useInstitutionBranding()
+  const brandingStyle = useInstitutionBrandingStyle()
+  const logoSrc = branding.logoUrl || "/ahms-logo.png"
   const [user, setUser] = useState<User | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -100,6 +105,12 @@ export function InstitutionAdminShell({
         }
 
         setUser(currentUser)
+        if (currentUser.institution?.id) {
+          cacheBranding(
+            currentUser.institution.id,
+            brandingFromInstitution(currentUser.institution),
+          )
+        }
       } catch {
         if (cancelled) return
         clearAuth()
@@ -164,15 +175,20 @@ export function InstitutionAdminShell({
                 "group flex items-center gap-3 rounded-xl transition duration-200",
                 compact ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
                 active
-                  ? "bg-[#ABD2F2]/55 text-[#0047AB] shadow-[0_0_0_1px_rgba(162,212,237,0.8)]"
+                  ? "text-white shadow-sm"
                   : "text-[#0047AB]/75 hover:bg-[#A2D4ED]/25 hover:text-[#05082E]",
               )}
+              style={
+                active
+                  ? { backgroundColor: "var(--brand-primary)", color: branding.secondaryColor }
+                  : undefined
+              }
             >
               {Icon ? (
                 <Icon
                   className={cn(
                     "size-4 shrink-0 transition",
-                    active ? "text-[#E88D1D]" : "text-[#0047AB]/55 group-hover:text-[#0047AB]",
+                    active ? "text-[var(--brand-accent)]" : "text-[#0047AB]/55 group-hover:text-[#0047AB]",
                   )}
                 />
               ) : null}
@@ -194,9 +210,13 @@ export function InstitutionAdminShell({
   const sidebar = (opts: { compact: boolean; showCollapse: boolean }) => (
     <aside
       className={cn(
-        "relative flex h-full flex-col overflow-hidden border-r border-[#A2D4ED]/50 bg-white text-[#05082E] transition-[width] duration-300",
+        "relative flex h-full flex-col overflow-hidden border-r text-[#05082E] transition-[width] duration-300",
         opts.compact ? "w-[4.5rem]" : "w-64",
       )}
+      style={{
+        borderColor: `${branding.primaryColor}33`,
+        backgroundColor: branding.secondaryColor,
+      }}
     >
       <div
         className="pointer-events-none absolute inset-0 opacity-80"
@@ -214,7 +234,7 @@ export function InstitutionAdminShell({
       >
         <span className="flex size-10 shrink-0 overflow-hidden rounded-xl bg-white shadow-[0_6px_18px_rgba(162,212,237,0.45)] ring-1 ring-[#A2D4ED]/60">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/ahms-logo.png" alt="AHMS" className="size-10 object-cover" />
+          <img src={logoSrc} alt={institutionName || "Institution"} className="size-10 object-cover" />
         </span>
         {!opts.compact && (
           <div className="min-w-0">
@@ -280,7 +300,10 @@ export function InstitutionAdminShell({
   )
 
   return (
-    <div className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased">
+    <div
+      className="relative flex min-h-screen bg-[#f4f7fb] font-sans text-[#05082E] antialiased"
+      style={brandingStyle}
+    >
       <div
         className="pointer-events-none absolute inset-0"
         aria-hidden
@@ -314,7 +337,7 @@ export function InstitutionAdminShell({
       ) : null}
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 border-b border-[#A2D4ED]/45 bg-white/90 shadow-[0_1px_0_rgba(162,212,237,0.35)] backdrop-blur-md">
+        <header className="sticky top-0 z-40 border-b bg-white/90 shadow-[0_1px_0_rgba(162,212,237,0.35)] backdrop-blur-md" style={{ borderColor: `${branding.primaryColor}30` }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <Button

@@ -6,6 +6,7 @@ import {
   MessageSquare,
   School,
   Upload,
+  Settings,
   Wallet,
   type LucideIcon,
 } from "lucide-react"
@@ -86,6 +87,12 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       label: "Import Students",
       description: "Bulk upload",
       icon: Upload,
+    },
+    {
+      href: "/admin/settings",
+      label: "Settings",
+      description: "Profile & branding",
+      icon: Settings,
     },
   ]
 }
