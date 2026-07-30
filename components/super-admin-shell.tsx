@@ -40,11 +40,11 @@ const SUPER_ADMIN_NAV = [
     exact: true,
   },
   {
-    href: "/admin/dashboard#institutions",
+    href: "/admin/institution",
     label: "Institutions",
     description: "Tenants & status",
     icon: Building2,
-    exact: false,
+    exact: true,
   },
 ] as const
 
@@ -142,8 +142,9 @@ export function SuperAdminShell({
         )}
         {SUPER_ADMIN_NAV.map((item) => {
           const Icon = item.icon
-          const pathOnly = item.href.split("#")[0]
-          const isHighlighted = item.exact && pathname === pathOnly
+          const isHighlighted = item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
             <Link
               key={item.href}
@@ -153,7 +154,7 @@ export function SuperAdminShell({
                 "group flex items-center gap-3 rounded-xl transition duration-200",
                 compact ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
                 isHighlighted
-                  ? "bg-[#ABD2F2]/55 text-[#0047AB] shadow-[0_0_0_1px_rgba(162,212,237,0.8)]"
+                  ? "text-[#05082E]"
                   : "text-[#0047AB]/75 hover:bg-[#A2D4ED]/25 hover:text-[#05082E]",
               )}
             >
@@ -165,8 +166,17 @@ export function SuperAdminShell({
               />
               {!compact && (
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium">{item.label}</span>
-                  <span className="block text-[11px] text-[#0047AB]/50">{item.description}</span>
+                  <span className={cn("block text-sm", isHighlighted ? "font-semibold" : "font-medium")}>
+                    {item.label}
+                  </span>
+                  <span
+                    className={cn(
+                      "block text-[11px]",
+                      isHighlighted ? "text-[#0047AB]/70" : "text-[#0047AB]/50",
+                    )}
+                  >
+                    {item.description}
+                  </span>
                 </span>
               )}
             </Link>

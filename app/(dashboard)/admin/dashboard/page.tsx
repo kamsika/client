@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
+  Building2,
   GraduationCap,
   LayoutGrid,
-  MessageSquare,
   Pencil,
   School,
   Users,
@@ -22,9 +23,8 @@ import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
 import { cn } from "@/lib/utils"
 import { listClassrooms } from "@/services/classroom"
-import { listSmsLogs } from "@/services/sms-log"
 import { listStudents, listTeachers } from "@/services/student"
-import type { Classroom, SmsLog, Student, User } from "@/types"
+import type { Classroom, Student, User } from "@/types"
 
 const cardShell =
   "rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)]"
@@ -38,27 +38,25 @@ export default function AdminDashboardPage() {
 }
 
 function InstitutionAdminDashboard() {
+  const router = useRouter()
   const allowedRoles = ["super_admin", "institution_admin"]
 
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [loadingStudents, setLoadingStudents] = useState(true)
-  const [smsLogs, setSmsLogs] = useState<SmsLog[]>([])
   const [teachers, setTeachers] = useState<User[]>([])
   const [editingClassroomId, setEditingClassroomId] = useState<number | null>(null)
 
   const loadData = useCallback(async () => {
     try {
       setLoadingStudents(true)
-      const [cls, std, logs, tch] = await Promise.all([
+      const [cls, std, tch] = await Promise.all([
         listClassrooms(),
         listStudents(),
-        listSmsLogs(),
         listTeachers().catch(() => []),
       ])
       setClassrooms(cls)
       setStudents(std)
-      setSmsLogs(logs)
       setTeachers(tch)
     } catch {
       toast.error("Failed to load dashboard data")
@@ -93,6 +91,14 @@ function InstitutionAdminDashboard() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
+              label: "Institution",
+              value: "Manage",
+              icon: Building2,
+              gradient: "from-[#F9BF15]/20 via-white to-white",
+              iconWrap: "bg-[#F9BF15]/25 text-[#E88D1D]",
+              navigateTo: "/admin/institution",
+            },
+            {
               label: "Classrooms",
               value: classrooms.length,
               icon: LayoutGrid,
@@ -113,19 +119,17 @@ function InstitutionAdminDashboard() {
               gradient: "from-[#F9BF15]/20 via-white to-white",
               iconWrap: "bg-[#F9BF15]/25 text-[#E88D1D]",
             },
-            {
-              label: "SMS Sent",
-              value: smsLogs.length,
-              icon: MessageSquare,
-              gradient: "from-[#ABD2F2]/40 via-white to-white",
-              iconWrap: "bg-[#ABD2F2]/60 text-[#0047AB]",
-            },
-          ].map((card) => (
-            <div
+          ].map((card) => {
+            const CardTag = card.navigateTo ? "button" : "div"
+            return (
+            <CardTag
               key={card.label}
+              type={card.navigateTo ? "button" : undefined}
+              onClick={card.navigateTo ? () => router.push(card.navigateTo!) : undefined}
               className={cn(
-                "rounded-2xl border border-[#A2D4ED]/50 bg-gradient-to-br p-5 shadow-[0_10px_30px_rgba(5,8,46,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(162,212,237,0.25)]",
+                "rounded-2xl border border-[#A2D4ED]/50 bg-gradient-to-br p-5 text-left shadow-[0_10px_30px_rgba(5,8,46,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(162,212,237,0.25)]",
                 card.gradient,
+                card.navigateTo && "cursor-pointer",
               )}
             >
               <div className="flex items-center justify-between">
@@ -142,8 +146,9 @@ function InstitutionAdminDashboard() {
               <p className="mt-3 text-3xl font-bold tracking-tight tabular-nums text-[#05082E]">
                 {loadingStudents && card.label === "Students" ? "—" : card.value}
               </p>
-            </div>
-          ))}
+            </CardTag>
+            )
+          })}
         </div>
 
         <AdminStaffSection

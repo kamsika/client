@@ -226,7 +226,7 @@ export default function SuperAdminInstitutionDetailPage() {
           type="button"
           variant="outline"
           className={cn("h-9", outlineBtn)}
-          onClick={() => router.push("/admin/dashboard#institutions")}
+          onClick={() => router.push("/admin/institution")}
         >
           <ArrowLeft className="size-4" />
           Back to institutions

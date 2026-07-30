@@ -1,9 +1,8 @@
 import {
+  Building2,
   ClipboardCheck,
-  CreditCard,
   FileBarChart,
   LayoutDashboard,
-  MessageSquare,
   School,
   Upload,
   Settings,
@@ -29,12 +28,6 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
         icon: LayoutDashboard,
         exact: true,
       },
-      {
-        href: "/admin/billing",
-        label: "Billing",
-        description: "Plans & invoices",
-        icon: CreditCard,
-      },
     ]
   }
 
@@ -51,12 +44,6 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       label: "Fee Management",
       description: "Student monthly fees",
       icon: Wallet,
-    },
-    {
-      href: "/admin/billing",
-      label: "Billing",
-      description: "Plans & invoices",
-      icon: CreditCard,
     },
     {
       href: "/admin/attendance",
@@ -77,21 +64,21 @@ export function getAdminNav(isSuperAdmin: boolean): AdminNavItem[] {
       icon: School,
     },
     {
-      href: "/admin/sms-logs",
-      label: "SMS Logs",
-      description: "Parent alerts",
-      icon: MessageSquare,
-    },
-    {
       href: "/admin/students/import",
       label: "Import Students",
       description: "Bulk upload",
       icon: Upload,
     },
     {
+      href: "/admin/institution",
+      label: "Institution",
+      description: "Profile & branding",
+      icon: Building2,
+    },
+    {
       href: "/admin/settings",
       label: "Settings",
-      description: "Profile & branding",
+      description: "Security & account",
       icon: Settings,
     },
   ]

@@ -175,14 +175,9 @@ export function InstitutionAdminShell({
                 "group flex items-center gap-3 rounded-xl transition duration-200",
                 compact ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
                 active
-                  ? "text-white shadow-sm"
+                  ? "text-[#05082E]"
                   : "text-[#0047AB]/75 hover:bg-[#A2D4ED]/25 hover:text-[#05082E]",
               )}
-              style={
-                active
-                  ? { backgroundColor: "var(--brand-primary)", color: branding.secondaryColor }
-                  : undefined
-              }
             >
               {Icon ? (
                 <Icon
@@ -194,9 +189,18 @@ export function InstitutionAdminShell({
               ) : null}
               {!compact && (
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium">{item.label}</span>
+                  <span className={cn("block text-sm", active ? "font-semibold" : "font-medium")}>
+                    {item.label}
+                  </span>
                   {item.description ? (
-                    <span className="block text-[11px] text-[#0047AB]/50">{item.description}</span>
+                    <span
+                      className={cn(
+                        "block text-[11px]",
+                        active ? "text-[#0047AB]/70" : "text-[#0047AB]/50",
+                      )}
+                    >
+                      {item.description}
+                    </span>
                   ) : null}
                 </span>
               )}
