@@ -51,7 +51,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -499,12 +498,6 @@ export function SuperAdminInstitutionsPage() {
         if (!open) setFormErrors({})
       }}
     >
-      <DialogTrigger
-        render={<Button className={cn("h-10", primaryBtn)} />}
-      >
-        <Plus className="size-4" />
-        Create Institution
-      </DialogTrigger>
       <DialogContent className="border-[#A2D4ED]/20 sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95">
         <DialogHeader>
           <DialogTitle className="text-[#05082E]">New Institution</DialogTitle>
@@ -610,6 +603,8 @@ export function SuperAdminInstitutionsPage() {
       description="Search, filter, and manage tenant activation"
       notificationItems={notificationItems}
     >
+      {createDialog}
+
       <Dialog open={credentialsOpen} onOpenChange={setCredentialsOpen}>
         <DialogContent className="border-[#A2D4ED]/20 sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95">
           <DialogHeader>
