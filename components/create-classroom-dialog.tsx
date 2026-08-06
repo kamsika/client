@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getApiErrorMessage } from "@/lib/api-errors"
+import { selectItems } from "@/lib/select-items"
 import { cn } from "@/lib/utils"
 import {
   createClassroom,
@@ -617,6 +618,12 @@ export function CreateClassroomDialog({
                     <Select
                       value={row.teacherId || null}
                       onValueChange={(value) => value && updateAssignment(row.id, { teacherId: value })}
+                      items={selectItems(
+                        teachers.map((teacher) => ({
+                          value: teacher.id,
+                          label: teacher.full_name || `Teacher #${teacher.id}`,
+                        })),
+                      )}
                     >
                       <SelectTrigger className={cn(fieldClass, "w-full")}>
                         <SelectValue placeholder="Select teacher" />
@@ -771,6 +778,12 @@ export function CreateClassroomDialog({
                                   onValueChange={(value) =>
                                     value && updateSlot(slot.id, { teacherId: value })
                                   }
+                                  items={selectItems(
+                                    teachers.map((teacher) => ({
+                                      value: teacher.id,
+                                      label: teacher.full_name || `Teacher #${teacher.id}`,
+                                    })),
+                                  )}
                                 >
                                   <SelectTrigger className={cn(fieldClass, "h-9 w-full")}>
                                     <SelectValue placeholder="Teacher" />

@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getAdminNav } from "@/lib/admin-nav"
 import { getStoredUser } from "@/lib/api-client"
 import { formatAttendanceDayLabel, localTodayISO } from "@/lib/format-time"
+import { selectItems } from "@/lib/select-items"
 import { listClassrooms } from "@/services/classroom"
 import type { Classroom, User } from "@/types"
 
@@ -90,6 +91,12 @@ export default function AdminAttendancePage() {
                 <Select
                   value={selectedClassroomId}
                   onValueChange={(value) => value && setSelectedClassroomId(value)}
+                  items={selectItems(
+                    classrooms.map((cls) => ({
+                      value: cls.id,
+                      label: cls.name,
+                    })),
+                  )}
                 >
                   <SelectTrigger id="admin-attendance-class" className="w-full">
                     <SelectValue placeholder="Select classroom" />

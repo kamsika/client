@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { getStoredUser } from "@/lib/api-client"
 import { getAdminNav } from "@/lib/admin-nav"
+import { selectItems } from "@/lib/select-items"
 import { getBilling, listInstitutions } from "@/services/institution"
 import type { BillingRecord, Institution, User } from "@/types"
 
@@ -88,6 +89,12 @@ export default function AdminBillingPage() {
           <Select
             value={String(selectedInstitutionId ?? "")}
             onValueChange={(v) => v && setSelectedInstitutionId(Number(v))}
+            items={selectItems(
+              institutions.map((inst) => ({
+                value: inst.id,
+                label: inst.name,
+              })),
+            )}
           >
             <SelectTrigger className="w-64">
               <SelectValue placeholder="Select institution" />

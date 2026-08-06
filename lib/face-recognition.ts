@@ -82,12 +82,17 @@ export interface FaceDetectionResult {
   box: FaceBox
 }
 
-/** Detect a single face and return both the 128-d descriptor and screen-space box. */
+/** Detect a single face and return both the 128-d descriptor and screen-space box.
+ * Returns null when zero or multiple faces are present (single-face policy).
+ */
 export async function detectFaceWithBox(
   video: HTMLVideoElement,
 ): Promise<FaceDetectionResult | null> {
   const detections = await detectFacesWithBoxes(video)
-  return detections[0] ?? null
+  if (detections.length !== 1) {
+    return null
+  }
+  return detections[0]
 }
 
 /** Detect all faces in the current video frame. */
@@ -166,6 +171,8 @@ export function matchWithFaceMatcher(
   }
 }
 
+export type FaceOverlaySeverity = "valid" | "multi" | "unknown" | "matched" | "already"
+
 /** Draw detection boxes (and optional labels) onto a canvas sized to the video. */
 export function drawFaceOverlays(
   canvas: HTMLCanvasElement,
@@ -175,6 +182,8 @@ export function drawFaceOverlays(
     label?: string
     matched?: boolean
     alreadyMarked?: boolean
+    /** Green = single valid face, red = multiple faces. */
+    severity?: FaceOverlaySeverity
   }>,
 ) {
   const width = video.videoWidth || video.clientWidth
@@ -195,10 +204,15 @@ export function drawFaceOverlays(
     const { x, y, width: boxW, height: boxH } = detection.box
     const alreadyMarked = detection.alreadyMarked ?? false
     const matched = detection.matched ?? false
+    const severity =
+      detection.severity ??
+      (alreadyMarked ? "already" : matched ? "matched" : "unknown")
 
-    if (alreadyMarked) {
-      ctx.strokeStyle = "#0047AB"
-    } else if (matched) {
+    if (severity === "multi") {
+      ctx.strokeStyle = "#EF4444"
+    } else if (severity === "valid" || severity === "matched") {
+      ctx.strokeStyle = "#22C55E"
+    } else if (severity === "already") {
       ctx.strokeStyle = "#0047AB"
     } else {
       ctx.strokeStyle = "#F9BF15"
@@ -211,15 +225,17 @@ export function drawFaceOverlays(
       ctx.font = `600 ${Math.max(14, Math.round(width / 40))}px system-ui, sans-serif`
       const textWidth = ctx.measureText(detection.label).width
       const labelH = Math.max(22, Math.round(width / 28))
-      if (alreadyMarked) {
+      if (severity === "multi") {
+        ctx.fillStyle = "rgba(239, 68, 68, 0.92)"
+      } else if (severity === "valid" || severity === "matched") {
+        ctx.fillStyle = "rgba(34, 197, 94, 0.92)"
+      } else if (severity === "already") {
         ctx.fillStyle = "rgba(0, 71, 171, 0.92)"
-      } else if (matched) {
-        ctx.fillStyle = "rgba(0, 71, 171, 0.9)"
       } else {
         ctx.fillStyle = "rgba(249, 191, 21, 0.92)"
       }
       ctx.fillRect(x, Math.max(0, y - labelH), textWidth + padding * 2, labelH)
-      ctx.fillStyle = alreadyMarked ? "#ffffff" : matched ? "#ffffff" : "#05082E"
+      ctx.fillStyle = severity === "unknown" ? "#05082E" : "#ffffff"
       ctx.fillText(detection.label, x + padding, Math.max(labelH - 6, y - 6))
     }
   }

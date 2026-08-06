@@ -100,6 +100,8 @@ export function FaceRecognitionSettingsPanel({ onChange }: FaceRecognitionSettin
           <Switch
             checked={settings.autoAttendance}
             onCheckedChange={(checked) => update({ autoAttendance: checked })}
+            className="data-checked:bg-[#0047AB] data-unchecked:bg-[#A2D4ED]/80"
+            aria-label="Auto attendance"
           />
         </div>
 
@@ -111,6 +113,8 @@ export function FaceRecognitionSettingsPanel({ onChange }: FaceRecognitionSettin
           <Switch
             checked={settings.soundNotification}
             onCheckedChange={(checked) => update({ soundNotification: checked })}
+            className="data-checked:bg-[#0047AB] data-unchecked:bg-[#A2D4ED]/80"
+            aria-label="Sound notification"
           />
         </div>
 

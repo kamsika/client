@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getApiErrorMessage } from "@/lib/api-errors"
+import { selectItems } from "@/lib/select-items"
 import { cn } from "@/lib/utils"
 import { createSubject } from "@/services/subject"
 import type { Subject, User } from "@/types"
@@ -114,6 +115,13 @@ export function SubjectSelect({
           const match = subjects.find((item) => item.name === next)
           onValueChange(next, match)
         }}
+        items={selectItems([
+          ...subjects.map((subject) => ({
+            value: subject.name,
+            label: subject.code ? `${subject.name} (${subject.code})` : subject.name,
+          })),
+          ...(allowAdd ? [{ value: ADD_NEW_VALUE, label: "Add New Subject" }] : []),
+        ])}
       >
         <SelectTrigger className={cn(fieldClass, "w-full", triggerClassName)}>
           <SelectValue placeholder={placeholder} />
@@ -176,6 +184,12 @@ export function SubjectSelect({
                   <Select
                     value={teacherId || null}
                     onValueChange={(next) => next && setTeacherId(next)}
+                    items={selectItems(
+                      teachers.map((teacher) => ({
+                        value: teacher.id,
+                        label: teacher.full_name || `Teacher #${teacher.id}`,
+                      })),
+                    )}
                   >
                     <SelectTrigger className={cn(fieldClass, "w-full")}>
                       <SelectValue placeholder="Select teacher" />

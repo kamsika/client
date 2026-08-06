@@ -90,17 +90,18 @@ function formatDateOnly(dateISO: string | null | undefined, fallbackISO: string)
 }
 
 function formatMethod(record: TeacherAttendanceHistoryRecord) {
-  const method =
+  const raw =
     record.attendanceMethod ||
     record.attendance_method ||
-    (record.markedVia === "qr"
-      ? "QR"
-      : record.markedVia === "manual"
-        ? "Manual"
-        : record.markedVia === "face"
-          ? "Face"
-          : null)
-  return method || "—"
+    record.markedVia ||
+    record.marked_via ||
+    ""
+  const normalized = String(raw).trim().toLowerCase()
+  if (normalized.includes("face")) return "FACE"
+  if (normalized === "qr" || normalized === "qr_code" || normalized === "qrcode") return "QR"
+  if (normalized === "manual") return "Manual"
+  if (raw === "FACE" || raw === "QR") return raw
+  return raw || "—"
 }
 
 function formatTimeOnly(timestamp: string | null | undefined) {

@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { selectItems } from "@/lib/select-items"
 import { formatLocalDateTime } from "@/lib/format-time"
 import { getStudentAttendance } from "@/services/attendance"
 import { getMyChildren } from "@/services/student"
@@ -86,14 +87,23 @@ export default function ParentDashboardPage() {
               <CardDescription>Real-time entry logs and absence metrics for your child</CardDescription>
             </div>
             {children.length > 0 && (
-              <Select value={selectedId} onValueChange={(v) => v && setSelectedId(v)}>
+              <Select
+                value={selectedId}
+                onValueChange={(v) => v && setSelectedId(v)}
+                items={selectItems(
+                  children.map((child) => ({
+                    value: child.id,
+                    label: child.full_name || child.registration_no || `Student #${child.id}`,
+                  })),
+                )}
+              >
                 <SelectTrigger className="w-48">
-                  <SelectValue />
+                  <SelectValue placeholder="Select child" />
                 </SelectTrigger>
                 <SelectContent>
                   {children.map((child) => (
                     <SelectItem key={child.id} value={String(child.id)}>
-                      {child.full_name}
+                      {child.full_name || child.registration_no}
                     </SelectItem>
                   ))}
                 </SelectContent>
