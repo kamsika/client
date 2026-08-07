@@ -10,17 +10,21 @@ import { cn } from "@/lib/utils"
 import { PwaRegistration } from "@/components/pwa-registration"
 
 export const metadata: Metadata = {
-  title: "AHMS Student Management",
-  description: "Attendance and student management for tuition centres.",
+  title: "Student Management System",
+  description: "Student Attendance and Tuition Management System",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/ahms-logo.png", apple: "/ahms-logo.png" },
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "AHMS" },
+  icons: { icon: "/icons/icon-192x192.png", apple: "/icons/icon-180x180.png" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SMS" },
+  other: { "mobile-web-app-capable": "yes" },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#0047ab",
+  themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 }
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })

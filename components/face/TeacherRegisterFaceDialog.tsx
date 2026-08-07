@@ -228,12 +228,6 @@ export function TeacherRegisterFaceDialog({
     }
   }, [open, cameraActive, modelsReady, saving])
 
-  useEffect(() => {
-    if (sampleCount < TARGET_SAMPLES || !capturingRef.current || saving) return
-    void finalizeCapture()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sampleCount])
-
   async function finalizeCapture() {
     if (saving) return
     capturingRef.current = false
@@ -266,6 +260,13 @@ export function TeacherRegisterFaceDialog({
       setSaving(false)
     }
   }
+
+  useEffect(() => {
+    if (sampleCount < TARGET_SAMPLES || !capturingRef.current || saving) return
+    void finalizeCapture()
+    // Saving must begin only when a newly captured sample reaches the target.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sampleCount])
 
   function beginCapture() {
     if (!cameraActive) {

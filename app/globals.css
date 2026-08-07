@@ -125,5 +125,36 @@
     }
   html {
     @apply font-sans;
-    }
+    min-height: 100%;
+    overscroll-behavior-y: none;
+  }
+  body {
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
+  }
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+/* Keep fixed mobile controls clear of notches and the home indicator. */
+@supports (padding: max(0px)) {
+  [data-mobile-bottom-nav] {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 640px) {
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }

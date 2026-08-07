@@ -772,7 +772,6 @@ export function KioskAttendanceScreen({
         return
       }
 
-      const now = Date.now()
       // During global pause, still recognize faces so returning students can see "Already marked".
       // New Present marks are blocked inside recordMatch.
 
@@ -1000,7 +999,7 @@ export function KioskAttendanceScreen({
               badLabel="No faces enrolled"
               icon={<ScanFace className="size-3.5" />}
             />
-            {scanning && cameraActive && recognitionPausedUntil <= Date.now() && detectedFaceCount === 1 && (
+            {scanning && cameraActive && recognitionPausedUntil === 0 && detectedFaceCount === 1 && (
               <Badge
                 variant="outline"
                 className="gap-1.5 border-[#A2D4ED]/80 bg-[#ABD2F2]/90 text-[#0047AB]"
@@ -1018,7 +1017,7 @@ export function KioskAttendanceScreen({
                 Multiple faces
               </Badge>
             )}
-            {recognitionPausedUntil > Date.now() && (
+            {recognitionPausedUntil > 0 && (
               <Badge
                 variant="outline"
                 className="gap-1.5 border-emerald-200 bg-white/95 text-emerald-800"
