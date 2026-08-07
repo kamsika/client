@@ -1,6 +1,7 @@
 import axios from "axios"
 
 import { TENANT_HANDOFF_PARAM, TENANT_HEADER, getClientTenant, withTenantPrefix } from "@/lib/tenant"
+import { OFFLINE_ATTENDANCE_MESSAGE, clearPwaCaches } from "@/lib/pwa"
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim()
 const API_BASE_URL = (configuredApiUrl || "http://localhost:5000").replace(/\/+$/, "")
@@ -14,6 +15,14 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
+    const method = (config.method || "get").toLowerCase()
+    const isMutation = !["get", "head", "options"].includes(method)
+    const requestUrl = String(config.url || "")
+    if (isMutation && requestUrl.includes("/api/attendance") && !navigator.onLine) {
+      const error = new Error(OFFLINE_ATTENDANCE_MESSAGE) as Error & { code?: string }
+      error.code = "ERR_NETWORK"
+      return Promise.reject(error)
+    }
     const token = localStorage.getItem("access_token")
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -34,6 +43,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("access_token")
       localStorage.removeItem("user")
+      void clearPwaCaches()
       if (!window.location.pathname.startsWith("/auth")) {
         window.location.href = "/auth/login"
       }

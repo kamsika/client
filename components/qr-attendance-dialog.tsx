@@ -18,6 +18,8 @@ import { getClassroomAttendance, markAttendanceByScan } from "@/services/attenda
 import { AttendanceSubjectSelectionDialog } from "@/components/attendance-subject-selection-dialog"
 import type { AttendanceSubjectOption } from "@/services/attendance"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { OFFLINE_ATTENDANCE_MESSAGE } from "@/lib/pwa"
 import type { AttendanceRecord } from "@/types"
 
 interface QrAttendanceDialogProps {
@@ -159,6 +161,7 @@ export function QrAttendanceDialog({
   open,
   onOpenChange,
 }: QrAttendanceDialogProps) {
+  const online = useOnlineStatus()
   const readerId = `qr-reader-${classroomId}`
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const recordsRef = useRef<AttendanceRecord[]>([])
@@ -177,6 +180,7 @@ export function QrAttendanceDialog({
     paymentStatus?: "Pending" | "Paid" | "Overdue"
   } | null>(null)
   const recentScansRef = useRef<Map<string, number>>(new Map())
+  const lastOfflineNoticeRef = useRef(0)
 
   const loadStudents = useCallback(async () => {
     setLoadingStudents(true)
@@ -218,6 +222,14 @@ export function QrAttendanceDialog({
   const processScan = useCallback(
     async (rawValue: string) => {
       if (pendingSelection) return
+      if (!online) {
+        const now = Date.now()
+        if (now - lastOfflineNoticeRef.current > 5000) {
+          lastOfflineNoticeRef.current = now
+          toast.error(OFFLINE_ATTENDANCE_MESSAGE)
+        }
+        return
+      }
       // Exact scanned QR text — never substitute another student's ID.
       const scannedId = rawValue.trim()
       if (!scannedId) return
@@ -279,7 +291,7 @@ export function QrAttendanceDialog({
         toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`))
       }
     },
-    [classroomId, loadStudents, pendingSelection],
+    [classroomId, loadStudents, online, pendingSelection],
   )
 
   const startScanner = useCallback(
@@ -354,6 +366,10 @@ export function QrAttendanceDialog({
 
   async function confirmUpcomingClasses(selectedSubjects: string[]) {
     if (!pendingSelection) return
+    if (!online) {
+      toast.error(OFFLINE_ATTENDANCE_MESSAGE)
+      return
+    }
     try {
       const result = await markAttendanceByScan(
         pendingSelection.scannedId,
@@ -484,12 +500,15 @@ export function QrAttendanceDialog({
                 <p>
                   {loadingStudents || !studentsReady
                     ? "Loading students..."
+                    : !online
+                      ? OFFLINE_ATTENDANCE_MESSAGE
                     : "Your browser will ask to use the camera. Click Allow when prompted."}
                 </p>
                 <Button
                   type="button"
                   onClick={() => void handleEnableCamera()}
-                  disabled={loadingStudents || !studentsReady || cameraStarting}
+                  disabled={!online || loadingStudents || !studentsReady || cameraStarting}
+                  title={!online ? OFFLINE_ATTENDANCE_MESSAGE : undefined}
                 >
                   <Camera className="size-4" />
                   {cameraStarting ? "Starting camera..." : "Allow Camera Access"}

@@ -34,6 +34,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { getApiErrorMessage, isManualQrConflict } from "@/lib/api-errors"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { OFFLINE_ATTENDANCE_MESSAGE } from "@/lib/pwa"
 import { formatLocalTime, localNowTimeHHMM, localTodayISO } from "@/lib/format-time"
 import { selectItems } from "@/lib/select-items"
 import { cn } from "@/lib/utils"
@@ -85,6 +87,7 @@ function initialDraftStatus(student: ManualAttendanceStudentRow): DraftStatus {
 }
 
 export function ManualAttendancePanel() {
+  const online = useOnlineStatus()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [classroomId, setClassroomId] = useState("")
   const [gradeFilter, setGradeFilter] = useState("All")
@@ -236,6 +239,10 @@ export function ManualAttendancePanel() {
   }
 
   async function performSave(forceOverwrite = false) {
+    if (!online) {
+      toast.error(OFFLINE_ATTENDANCE_MESSAGE)
+      return
+    }
     if (!classroomId) {
       toast.error("Select a classroom")
       return
@@ -440,7 +447,8 @@ export function ManualAttendancePanel() {
               type="button"
               className="bg-[#05082E] text-white hover:bg-[#05082E]/90"
               onClick={() => void handleSave()}
-              disabled={saving || loadingRoster || !resolvedSubject || students.length === 0}
+              disabled={!online || saving || loadingRoster || !resolvedSubject || students.length === 0}
+              title={!online ? OFFLINE_ATTENDANCE_MESSAGE : undefined}
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               Save Attendance
@@ -580,7 +588,7 @@ export function ManualAttendancePanel() {
             <Button
               type="button"
               className="bg-[#05082E] text-white hover:bg-[#05082E]/90"
-              disabled={saving}
+              disabled={!online || saving}
               onClick={() => void performSave(true)}
             >
               {saving ? (

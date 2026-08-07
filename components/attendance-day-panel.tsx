@@ -17,6 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatLocalTime, localTodayISO } from "@/lib/format-time"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { OFFLINE_ATTENDANCE_MESSAGE } from "@/lib/pwa"
 import { getClassroomAttendance, markAttendance } from "@/services/attendance"
 import type { AttendanceRecord, AttendanceSummary } from "@/types"
 
@@ -42,6 +44,7 @@ export function AttendanceDayPanel({
   const [markingId, setMarkingId] = useState<number | null>(null)
   const [historyStudentId, setHistoryStudentId] = useState<number | null>(null)
   const [historyStudentLabel, setHistoryStudentLabel] = useState<string | null>(null)
+  const online = useOnlineStatus()
 
   const isToday = date === localTodayISO()
   const canMark = allowMarkPresent && isToday
@@ -76,6 +79,10 @@ export function AttendanceDayPanel({
   }, [isToday, load])
 
   async function handleMarkPresent(studentId: number) {
+    if (!online) {
+      toast.error(OFFLINE_ATTENDANCE_MESSAGE)
+      return
+    }
     if (!canMark) {
       toast.error("Marking Present is only available for today's date.")
       return
@@ -201,7 +208,8 @@ export function AttendanceDayPanel({
                               type="button"
                               size="sm"
                               variant="outline"
-                              disabled={markingId === student.id}
+                              disabled={!online || markingId === student.id}
+                              title={!online ? OFFLINE_ATTENDANCE_MESSAGE : undefined}
                               onClick={() => void handleMarkPresent(student.id)}
                             >
                               {markingId === student.id ? "Saving..." : "Mark Present"}
