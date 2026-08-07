@@ -41,6 +41,12 @@ export function StudentFaceRegistration() {
   const [cameraError, setCameraError] = useState<string | null>(null)
 
   const [faceBox, setFaceBox] = useState<FaceBox | null>(null)
+  const [overlayStyle, setOverlayStyle] = useState<{
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
   const [liveDescriptor, setLiveDescriptor] = useState<number[] | null>(null)
   const [capturedDescriptor, setCapturedDescriptor] = useState<number[] | null>(null)
   const [saving, setSaving] = useState(false)
@@ -94,6 +100,7 @@ export function StudentFaceRegistration() {
   useEffect(() => {
     if (!cameraActive || !modelsReady) {
       setFaceBox(null)
+      setOverlayStyle(null)
       setLiveDescriptor(null)
       return
     }
@@ -107,10 +114,16 @@ export function StudentFaceRegistration() {
         if (cancelled) return
         if (!result) {
           setFaceBox(null)
+          setOverlayStyle(null)
           setLiveDescriptor(null)
           return
         }
         setFaceBox(result.box)
+        setOverlayStyle(
+          videoRef.current && frameRef.current
+            ? mapBoxToOverlay(result.box, videoRef.current, frameRef.current)
+            : null,
+        )
         setLiveDescriptor(result.descriptor)
       } catch {
         // Ignore transient frame errors.
@@ -127,6 +140,7 @@ export function StudentFaceRegistration() {
     if (videoRef.current) stopFaceCamera(videoRef.current)
     setCameraActive(false)
     setFaceBox(null)
+    setOverlayStyle(null)
     setLiveDescriptor(null)
   }, [])
 
@@ -178,6 +192,11 @@ export function StudentFaceRegistration() {
       }
       setCapturedDescriptor(result.descriptor)
       setFaceBox(result.box)
+      setOverlayStyle(
+        frameRef.current
+          ? mapBoxToOverlay(result.box, videoRef.current, frameRef.current)
+          : null,
+      )
       setLiveDescriptor(result.descriptor)
       toast.success("Face captured — review and click Save Face Data")
     } catch {
@@ -212,10 +231,6 @@ export function StudentFaceRegistration() {
       setSaving(false)
     }
   }
-
-  const overlayStyle = faceBox && videoRef.current && frameRef.current
-    ? mapBoxToOverlay(faceBox, videoRef.current, frameRef.current)
-    : null
 
   return (
     <Card className="border-[#A2D4ED]/60 shadow-[0_12px_40px_rgba(5,8,46,0.05)]">

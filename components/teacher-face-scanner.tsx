@@ -84,9 +84,11 @@ export function TeacherFaceScanner() {
   const [recentScans, setRecentScans] = useState<RecentScan[]>([])
   const [unknownFlash, setUnknownFlash] = useState(false)
 
-  previewRef.current = preview
-  markingRef.current = markingAttendance
-  thresholdRef.current = settings.recognitionThreshold
+  useEffect(() => {
+    previewRef.current = preview
+    markingRef.current = markingAttendance
+    thresholdRef.current = settings.recognitionThreshold
+  }, [preview, markingAttendance, settings.recognitionThreshold])
 
   const stopCamera = useCallback(() => {
     if (videoRef.current) {
