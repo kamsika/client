@@ -76,6 +76,8 @@ interface ScannedStudentDetailsCardProps {
   student: Student
   marking?: boolean
   marked?: boolean
+  actionDisabled?: boolean
+  actionDisabledReason?: string
   onMarkAttendance: (selection: {
     selectedSubjectIds: number[]
     selectedSubjects: string[]
@@ -87,6 +89,8 @@ export function ScannedStudentDetailsCard({
   student,
   marking = false,
   marked = false,
+  actionDisabled = false,
+  actionDisabledReason,
   onMarkAttendance,
   onDismiss,
 }: ScannedStudentDetailsCardProps) {
@@ -134,7 +138,7 @@ export function ScannedStudentDetailsCard({
   }
 
   function toggleSubject(key: string, disabled: boolean) {
-    if (disabled || marking || marked) return
+    if (disabled || marking || marked || actionDisabled) return
     setSelectedKeys((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
     )
@@ -227,7 +231,7 @@ export function ScannedStudentDetailsCard({
             <ul className="space-y-2">
               {subjects.map((subject) => {
                 const checked = selectedKeys.includes(subject.key)
-                const disabled = subject.alreadyMarked || marking || marked
+                const disabled = subject.alreadyMarked || marking || marked || actionDisabled
                 return (
                   <li key={subject.key}>
                     <label
@@ -308,7 +312,7 @@ export function ScannedStudentDetailsCard({
         </div>
       </CardContent>
 
-      <CardFooter className="flex flex-col gap-2 border-t border-[#A2D4ED]/35 py-4 sm:flex-row">
+      <CardFooter className="flex flex-col gap-2 border-t border-[#A2D4ED]/35 py-4 sm:flex-row sm:flex-wrap">
         {marked ? (
           <div className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-sm font-semibold text-emerald-700">
             <Check className="size-4" />
@@ -321,6 +325,7 @@ export function ScannedStudentDetailsCard({
               className="w-full flex-1 bg-[#05082E] text-white hover:bg-[#05082E]/90"
               onClick={handleMark}
               disabled={
+                actionDisabled ||
                 marking ||
                 subjects.length === 0 ||
                 selectableCount === 0 ||
@@ -338,6 +343,11 @@ export function ScannedStudentDetailsCard({
                 "Mark Attendance"
               )}
             </Button>
+            {actionDisabled && actionDisabledReason ? (
+              <p className="w-full text-center text-xs font-medium text-amber-700 sm:order-first sm:basis-full" role="status">
+                {actionDisabledReason}
+              </p>
+            ) : null}
             <Button
               type="button"
               variant="outline"

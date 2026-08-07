@@ -1,4 +1,5 @@
 import { apiClient, clearAuth, getDashboardPath, storeAuth } from "@/lib/api-client"
+import { clearPwaCaches } from "@/lib/pwa"
 import type { AuthResponse, User } from "@/types"
 
 export async function login(email: string, password: string) {
@@ -16,8 +17,9 @@ export async function fetchCurrentUser() {
   return data.user
 }
 
-export function logout() {
+export async function logout() {
   clearAuth()
+  await clearPwaCaches().catch(() => undefined)
   window.location.href = "/auth/login"
 }
 

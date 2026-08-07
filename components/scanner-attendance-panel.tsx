@@ -5,6 +5,8 @@ import { toast } from "sonner"
 
 import { ScannedStudentDetailsCard } from "@/components/scanned-student-details-card"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { useOnlineStatus } from "@/hooks/use-online-status"
+import { OFFLINE_ATTENDANCE_MESSAGE } from "@/lib/pwa"
 import {
   processAttendance,
   type AttendanceMethod,
@@ -56,6 +58,7 @@ export function ScannerAttendancePanel({
 }: ScannerAttendancePanelProps) {
   const [marking, setMarking] = useState(false)
   const [localMarked, setLocalMarked] = useState(marked)
+  const online = useOnlineStatus()
   const isMarked = marked || localMarked
 
   async function handleMarkAttendance(selection: {
@@ -63,6 +66,10 @@ export function ScannerAttendancePanel({
     selectedSubjects: string[]
   }) {
     if (isMarked || marking) return
+    if (!online) {
+      toast.error(OFFLINE_ATTENDANCE_MESSAGE)
+      return
+    }
     if (
       selection.selectedSubjectIds.length === 0 &&
       selection.selectedSubjects.length === 0
@@ -187,6 +194,8 @@ export function ScannerAttendancePanel({
       student={student}
       marking={marking}
       marked={isMarked}
+      actionDisabled={!online}
+      actionDisabledReason={OFFLINE_ATTENDANCE_MESSAGE}
       onMarkAttendance={(selection) => void handleMarkAttendance(selection)}
       onDismiss={onDismiss}
     />

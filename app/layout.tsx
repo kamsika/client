@@ -13,7 +13,13 @@ export const metadata: Metadata = {
   title: "Student Management System",
   description: "Student Attendance and Tuition Management System",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icons/icon-192x192.png", apple: "/icons/icon-180x180.png" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192x192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/icons/icon-180x180.png", type: "image/png", sizes: "180x180" }],
+  },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "SMS" },
   other: { "mobile-web-app-capable": "yes" },
 }
@@ -22,8 +28,6 @@ export const viewport: Viewport = {
   themeColor: "#2563eb",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 }
 
