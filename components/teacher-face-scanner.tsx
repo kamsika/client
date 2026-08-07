@@ -5,9 +5,9 @@ import { Camera, Loader2, ScanFace, VideoOff } from "lucide-react"
 import { toast } from "sonner"
 
 import { FaceRecognitionSettingsPanel } from "@/components/face/FaceRecognitionSettings"
-import { ScannedStudentDetailsCard } from "@/components/scanned-student-details-card"
+import { ScannerAttendancePanel } from "@/components/scanner-attendance-panel"
 import { Button } from "@/components/ui/button"
-import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { getApiErrorMessage } from "@/lib/api-errors"
 import {
   clearFaceOverlay,
   createFaceMatcher,
@@ -25,7 +25,6 @@ import {
   type FaceRecognitionSettings,
 } from "@/lib/face-settings"
 import { cn } from "@/lib/utils"
-import { processAttendance } from "@/services/attendance"
 import { lookupStudentByScannedId } from "@/services/student"
 import { listFaceProfiles, type StudentFaceProfile } from "@/services/student-face"
 import type { Student } from "@/types"
@@ -291,110 +290,9 @@ export function TeacherFaceScanner() {
     }
   }, [cameraActive, modelsReady, matcherReady, identifyStudent])
 
-  async function handleMarkAttendance(selection: {
-    selectedSubjectIds: number[]
-    selectedSubjects: string[]
-  }) {
-    if (!preview || markingAttendance || preview.marked) return
-    if (
-      selection.selectedSubjectIds.length === 0 &&
-      selection.selectedSubjects.length === 0
-    ) {
-      toast.error("Select at least one subject")
-      return
-    }
-
-    const { scannedId, student } = preview
-    const name = student.full_name || "Student"
-    const regNo = student.registration_no || scannedId
-
-    setMarkingAttendance(true)
-    setScanStatus(`Marking Present: ${name}…`)
-
-    try {
-      const result = await processAttendance({
-        studentId: scannedId,
-        selectedSubjects: selection.selectedSubjects,
-        selectedSubjectIds: selection.selectedSubjectIds,
-        attendanceMethod: "FACE",
-      })
-
-      const newlyMarked = result.newlyMarkedSubjects ?? []
-      const alreadyMarked = result.alreadyMarkedSubjects ?? []
-      const presentDetails = (result.presentNowDetails ?? []).map(
-        (item) => item.label || `${item.subjectName ?? item.subject_name}`,
-      )
-      const alreadyDetails = (result.alreadyMarkedDetails ?? []).map(
-        (item) =>
-          item.label || `Already marked for ${item.subjectName ?? item.subject_name}.`,
-      )
-
-      const isAlready =
-        result.status === "AlreadyMarked" ||
-        (newlyMarked.length === 0 && alreadyMarked.length > 0)
-
-      recentIdsRef.current.set(scannedId, Date.now())
-      setPreview((current) => (current ? { ...current, marked: true } : current))
-
-      setRecentScans((current) =>
-        [
-          {
-            id: `${scannedId}-${Date.now()}`,
-            studentName: name,
-            studentId: regNo,
-            status: isAlready ? "Already marked" : "Present",
-            at: Date.now(),
-          },
-          ...current,
-        ].slice(0, 8),
-      )
-
-      if (isAlready) {
-        setScanStatus(`Already marked: ${name}`)
-        toast.message(
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">
-              {name} · ID {regNo}
-            </p>
-            <p>
-              {alreadyDetails[0] ||
-                "Attendance already marked for this subject today."}
-            </p>
-          </div>,
-        )
-      } else {
-        setScanStatus(`Present: ${name}`)
-        toast.success(
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">
-              {name} · ID {regNo} · FACE
-            </p>
-            <p>{presentDetails[0] || "Attendance marked Present."}</p>
-          </div>,
-        )
-      }
-
-      window.setTimeout(() => {
-        setPreview(null)
-        setScanStatus("Camera ready — look at the camera to identify a student")
-      }, 1800)
-    } catch (error) {
-      if (isAlreadyScannedError(error)) {
-        setScanStatus(`Already marked: ${name}`)
-        toast.message("Attendance already marked for this subject today.")
-        setPreview((current) => (current ? { ...current, marked: true } : current))
-        window.setTimeout(() => {
-          setPreview(null)
-          setScanStatus("Camera ready — look at the camera to identify a student")
-        }, 1800)
-      } else {
-        const message = getApiErrorMessage(error, "Failed to mark attendance")
-        setScanStatus(message)
-        toast.error(message)
-      }
-    } finally {
-      setMarkingAttendance(false)
-    }
+  function dismissPreview() {
+    setPreview(null)
+    setScanStatus("Camera ready — look at the camera to identify a student")
   }
 
   return (
@@ -471,14 +369,32 @@ export function TeacherFaceScanner() {
         </div>
 
         {preview && (
-          <ScannedStudentDetailsCard
+          <ScannerAttendancePanel
+            scannedId={preview.scannedId}
             student={preview.student}
-            marking={markingAttendance}
+            attendanceMethod="FACE"
             marked={preview.marked}
-            onMarkAttendance={handleMarkAttendance}
-            onDismiss={() => {
-              setPreview(null)
-              setScanStatus("Camera ready — look at the camera to identify a student")
+            onMarkedChange={(next) =>
+              setPreview((current) => (current ? { ...current, marked: next } : current))
+            }
+            onMarkingChange={setMarkingAttendance}
+            onStatus={setScanStatus}
+            idleStatusMessage="Camera ready — look at the camera to identify a student"
+            onDismiss={dismissPreview}
+            onComplete={(payload) => {
+              recentIdsRef.current.set(payload.scannedId, Date.now())
+              setRecentScans((current) =>
+                [
+                  {
+                    id: `${payload.scannedId}-${Date.now()}`,
+                    studentName: payload.studentName,
+                    studentId: payload.registrationNo,
+                    status: payload.isAlready ? "Already marked" : "Present",
+                    at: Date.now(),
+                  },
+                  ...current,
+                ].slice(0, 8),
+              )
             }}
           />
         )}
