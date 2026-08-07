@@ -1,0 +1,14 @@
+{
+  "name": "AHMS Student Management",
+  "short_name": "AHMS",
+  "description": "Attendance and student management for tuition centres.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0047ab",
+  "icons": [
+    { "src": "/ahms-logo.png", "sizes": "any", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

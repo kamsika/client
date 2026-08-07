@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Inter } from "next/font/google"
 import Script from "next/script"
 
@@ -6,6 +7,21 @@ import { TenantProvider } from "@/components/tenant-provider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
+import { PwaRegistration } from "@/components/pwa-registration"
+
+export const metadata: Metadata = {
+  title: "AHMS Student Management",
+  description: "Attendance and student management for tuition centres.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/ahms-logo.png", apple: "/ahms-logo.png" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "AHMS" },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#0047ab",
+  width: "device-width",
+  initialScale: 1,
+}
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -50,6 +66,7 @@ export default function RootLayout({
         <ThemeProvider>
           <TenantProvider>{children}</TenantProvider>
           <Toaster richColors />
+          <PwaRegistration />
         </ThemeProvider>
       </body>
     </html>
