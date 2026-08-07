@@ -5,12 +5,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react"
 import { Camera, SwitchCamera } from "lucide-react"
 import { toast } from "sonner"
 
-import { ScannedStudentDetailsCard } from "@/components/scanned-student-details-card"
+import { ScannerAttendancePanel } from "@/components/scanner-attendance-panel"
 import { Button } from "@/components/ui/button"
-import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { getApiErrorMessage } from "@/lib/api-errors"
 import { getScannedStudentId } from "@/lib/parse-student-qr"
 import { cn } from "@/lib/utils"
-import { scanCenterAttendance } from "@/services/attendance"
 import { lookupStudentByScannedId } from "@/services/student"
 import type { Attendance, Student } from "@/types"
 
@@ -259,150 +258,6 @@ export function TeacherLiveQrScanner({
     [markingAttendance, preview],
   )
 
-  async function handleMarkAttendance(selection: {
-    selectedSubjectIds: number[]
-    selectedSubjects: string[]
-  }) {
-    if (!preview || markingAttendance || preview.marked) return
-    if (
-      selection.selectedSubjectIds.length === 0 &&
-      selection.selectedSubjects.length === 0
-    ) {
-      toast.error("Select at least one subject")
-      return
-    }
-
-    const { scannedId, student } = preview
-    const name = student.full_name || "Student"
-    const regNo = student.registration_no || scannedId
-
-    setMarkingAttendance(true)
-    setScanStatus(`Marking Present: ${name}…`)
-
-    try {
-      console.log(
-        "[QR] Sending student ID to API:",
-        scannedId,
-        "subjects:",
-        selection.selectedSubjects,
-      )
-      const result = await scanCenterAttendance({
-        scannedStudentId: scannedId,
-        selectedSubjects: selection.selectedSubjects,
-        selectedSubjectIds: selection.selectedSubjectIds,
-      })
-
-      const attendance = result.attendance ?? result.data
-      const newlyMarked = result.newlyMarkedSubjects ?? []
-      const alreadyMarked = result.alreadyMarkedSubjects ?? []
-      const presentDetails = (result.presentNowDetails ?? []).map(
-        (item) => item.label || `${item.subjectName ?? item.subject_name}`,
-      )
-      const alreadyDetails = (result.alreadyMarkedDetails ?? []).map(
-        (item) =>
-          item.label || `Already marked for ${item.subjectName ?? item.subject_name}.`,
-      )
-
-      const isAlready =
-        result.status === "AlreadyMarked" ||
-        (newlyMarked.length === 0 && alreadyMarked.length > 0)
-      const isSuccess =
-        result.status === "Present" ||
-        newlyMarked.length > 0 ||
-        Boolean(attendance)
-
-      recentScansRef.current.set(scannedId, Date.now())
-      setPreview((current) => (current ? { ...current, marked: true } : current))
-
-      setRecentScans((current) =>
-        [
-          {
-            id: `${scannedId}-${Date.now()}`,
-            studentName: name,
-            studentId: regNo,
-            status: isAlready ? "Already marked" : "Present",
-            at: Date.now(),
-          },
-          ...current,
-        ].slice(0, 8),
-      )
-
-      if (isAlready) {
-        setScanStatus(`Already marked: ${name}`)
-        toast.message(
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">
-              {name} · ID {regNo}
-            </p>
-            <p>
-              {alreadyDetails[0] ||
-                "Attendance already marked for this subject today."}
-            </p>
-          </div>,
-        )
-        window.setTimeout(() => {
-          setPreview(null)
-          setScanStatus("Camera ready — point at a student QR code")
-        }, 1800)
-        return
-      }
-
-      if (isSuccess) {
-        setScanStatus(`Marked Present: ${name}`)
-        toast.success(
-          <div className="space-y-1 text-sm">
-            <p className="font-semibold">Attendance marked successfully</p>
-            <p>
-              Name: <span className="font-medium">{name}</span>
-            </p>
-            <p>
-              Student ID: <span className="font-mono text-xs">{regNo}</span>
-            </p>
-            {(presentDetails.length > 0 || newlyMarked.length > 0) && (
-              <p>
-                {presentDetails.length > 0
-                  ? presentDetails.join("; ")
-                  : newlyMarked.join(", ")}
-              </p>
-            )}
-          </div>,
-        )
-        if (attendance) onMarked?.(attendance)
-        window.setTimeout(() => {
-          setPreview(null)
-          setScanStatus("Camera ready — point at a student QR code")
-        }, 1800)
-        return
-      }
-
-      setScanStatus(`Scan completed for ${name}`)
-      toast.message(
-        <div className="space-y-1 text-sm">
-          <p className="font-semibold">
-            {name} · ID {regNo}
-          </p>
-          <p>{result.message || "Scan processed."}</p>
-        </div>,
-      )
-    } catch (error) {
-      recentScansRef.current.delete(scannedId)
-      if (isAlreadyScannedError(error)) {
-        recentScansRef.current.set(scannedId, Date.now())
-        setPreview((current) => (current ? { ...current, marked: true } : current))
-        setScanStatus(`Already marked: ${scannedId}`)
-        toast.message(
-          getApiErrorMessage(error, "Attendance already marked for this subject today."),
-        )
-        return
-      }
-      const message = getApiErrorMessage(error, `Failed to mark attendance for ${scannedId}`)
-      setScanStatus(message)
-      toast.error(message)
-    } finally {
-      setMarkingAttendance(false)
-    }
-  }
-
   function dismissPreview() {
     setPreview(null)
     setScanStatus(cameraActive ? "Camera ready — point at a student QR code" : "Ready to scan")
@@ -618,12 +473,34 @@ export function TeacherLiveQrScanner({
       {cameraError && <p className="text-sm text-red-600">{cameraError}</p>}
 
       {preview ? (
-        <ScannedStudentDetailsCard
+        <ScannerAttendancePanel
+          scannedId={preview.scannedId}
           student={preview.student}
-          marking={markingAttendance}
+          attendanceMethod="QR"
           marked={preview.marked}
-          onMarkAttendance={(selection) => void handleMarkAttendance(selection)}
+          onMarkedChange={(next) =>
+            setPreview((current) => (current ? { ...current, marked: next } : current))
+          }
+          onMarkingChange={setMarkingAttendance}
+          onStatus={setScanStatus}
+          idleStatusMessage="Camera ready — point at a student QR code"
           onDismiss={dismissPreview}
+          onComplete={(payload) => {
+            recentScansRef.current.set(payload.scannedId, Date.now())
+            setRecentScans((current) =>
+              [
+                {
+                  id: `${payload.scannedId}-${Date.now()}`,
+                  studentName: payload.studentName,
+                  studentId: payload.registrationNo,
+                  status: payload.isAlready ? "Already marked" : "Present",
+                  at: Date.now(),
+                },
+                ...current,
+              ].slice(0, 8),
+            )
+            if (payload.attendance) onMarked?.(payload.attendance)
+          }}
         />
       ) : null}
 

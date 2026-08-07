@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table"
 import { getApiErrorMessage, isManualQrConflict } from "@/lib/api-errors"
 import { formatLocalTime, localNowTimeHHMM, localTodayISO } from "@/lib/format-time"
+import { selectItems } from "@/lib/select-items"
 import { cn } from "@/lib/utils"
 import {
   getManualAttendanceRoster,
@@ -326,6 +327,12 @@ export function ManualAttendancePanel() {
                   if (classroom?.grade?.trim()) setGradeFilter(classroom.grade.trim())
                 }}
                 disabled={loadingMeta}
+                items={selectItems(
+                  classrooms.map((classroom) => ({
+                    value: classroom.id,
+                    label: `${classroom.name}${classroom.grade ? ` · ${classroom.grade}` : ""}`,
+                  })),
+                )}
               >
                 <SelectTrigger className={fieldClass}>
                   <SelectValue placeholder="Select classroom" />

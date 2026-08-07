@@ -13,7 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { selectItems } from "@/lib/select-items"
 import { getStudyAnalytics } from "@/services/study-log"
+
+const RANGE_OPTIONS = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+] as const
 
 const studentNav = [
   { href: "/student/dashboard", label: "Dashboard" },
@@ -43,14 +50,20 @@ export default function StudentAnalyticsPage() {
               <CardTitle>Study Hours Trend</CardTitle>
               <CardDescription>Increase or decrease over chronological ranges</CardDescription>
             </div>
-            <Select value={days} onValueChange={(v) => v && setDays(v)}>
+            <Select
+              value={days}
+              onValueChange={(v) => v && setDays(v)}
+              items={selectItems([...RANGE_OPTIONS])}
+            >
               <SelectTrigger className="w-36">
-                <SelectValue />
+                <SelectValue placeholder="Select range" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
+                {RANGE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </CardHeader>

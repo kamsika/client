@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { getApiErrorMessage } from "@/lib/api-errors"
+import { selectItems } from "@/lib/select-items"
 import { cn } from "@/lib/utils"
 import { listClassrooms } from "@/services/classroom"
 import { listStudents } from "@/services/student"
@@ -297,8 +298,14 @@ export function TimetableManager() {
                     }
                   }}
                   disabled={loadingMeta}
+                  items={selectItems(
+                    classrooms.map((classroom) => ({
+                      value: classroom.id,
+                      label: classroom.name,
+                    })),
+                  )}
                 >
-                  <SelectTrigger id="timetable-classroom">
+                  <SelectTrigger id="timetable-classroom" className="w-full min-w-[16rem]">
                     <SelectValue placeholder="Select classroom" />
                   </SelectTrigger>
                   <SelectContent>
@@ -322,8 +329,14 @@ export function TimetableManager() {
                     }
                   }}
                   disabled={loadingMeta}
+                  items={selectItems(
+                    students.map((student) => ({
+                      value: student.id,
+                      label: `${student.full_name || student.registration_no} (${student.registration_no})`,
+                    })),
+                  )}
                 >
-                  <SelectTrigger id="timetable-student">
+                  <SelectTrigger id="timetable-student" className="w-full min-w-[16rem]">
                     <SelectValue placeholder="Select student" />
                   </SelectTrigger>
                   <SelectContent>
@@ -342,6 +355,7 @@ export function TimetableManager() {
               <Select
                 value={form.dayOfWeek}
                 onValueChange={(value) => value && setForm((prev) => ({ ...prev, dayOfWeek: value }))}
+                items={selectItems(DAYS.map((day) => ({ value: day, label: day })))}
               >
                 <SelectTrigger id="timetable-day">
                   <SelectValue placeholder="Select day" />

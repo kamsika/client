@@ -41,7 +41,7 @@ export default function TeacherAttendanceMethodsPage() {
           </span>
           <h3 className="mt-4 text-lg font-semibold text-[#05082E]">Face Attendance</h3>
           <p className="mt-2 text-sm text-[#0047AB]/75">
-            Real-time face recognition with automatic Present marking and duplicate protection.
+            Recognize the student by face, then mark attendance with the same subject flow as QR.
           </p>
         </Link>
       </div>

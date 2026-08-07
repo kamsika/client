@@ -111,25 +111,73 @@ export type AttendanceScanResponse = {
   delta_minutes?: number
 }
 
+/** Attendance input method — both scanners call the same `/api/attendance/scan` flow. */
+export type AttendanceMethod = "QR" | "FACE"
+
+/**
+ * Shared attendance processor for QR and Face scanners.
+ * Identification happens upstream; this only marks attendance via the existing scan API.
+ */
+export async function processAttendance(payload: {
+  studentId: string
+  classroomId?: number
+  selectedSubjects?: string[]
+  selectedSubjectIds?: number[]
+  attendanceMethod?: AttendanceMethod
+  scannedAt?: string
+}) {
+  const studentId = payload.studentId?.trim()
+  if (!studentId) {
+    throw new Error("student_id is required")
+  }
+  if (
+    !(payload.selectedSubjectIds && payload.selectedSubjectIds.length > 0) &&
+    !(payload.selectedSubjects && payload.selectedSubjects.length > 0)
+  ) {
+    throw new Error("Select at least one subject")
+  }
+
+  const methodLabel = (payload.attendanceMethod || "QR").toUpperCase() === "FACE" ? "FACE" : "QR"
+  const markedVia = methodLabel === "FACE" ? "face" : "qr"
+
+  console.log(
+    `[${methodLabel}] processAttendance student:`,
+    studentId,
+    "subjects:",
+    payload.selectedSubjects,
+    "subjectIds:",
+    payload.selectedSubjectIds,
+  )
+
+  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", {
+    student_id: studentId,
+    classroom_id: payload.classroomId,
+    status: "Present",
+    scanned_at: payload.scannedAt ?? new Date().toISOString(),
+    prevent_duplicate: true,
+    selected_subjects: payload.selectedSubjects,
+    selected_subject_ids: payload.selectedSubjectIds,
+    marked_via: markedVia,
+    markedVia,
+    attendance_method: methodLabel,
+    attendanceMethod: methodLabel,
+  })
+  return data
+}
+
 export async function markAttendanceByScan(
   scannedStudentId: string,
   classroomId: number,
   scannedAt: string,
   selectedSubjects?: string[],
 ) {
-  console.log("Sending student ID to API:", scannedStudentId)
-  const { data } = await apiClient.post<AttendanceScanResponse>(
-    "/api/attendance/scan",
-    {
-      student_id: scannedStudentId,
-      classroom_id: classroomId,
-      status: "Present",
-      scanned_at: scannedAt,
-      prevent_duplicate: true,
-      selected_subjects: selectedSubjects,
-    },
-  )
-  return data
+  return processAttendance({
+    studentId: scannedStudentId,
+    classroomId,
+    scannedAt,
+    selectedSubjects,
+    attendanceMethod: "QR",
+  })
 }
 
 export async function scanCenterAttendance(payload: {
@@ -141,31 +189,13 @@ export async function scanCenterAttendance(payload: {
   if (!payload.scannedStudentId?.trim()) {
     throw new Error("Invalid QR code")
   }
-  if (
-    !(payload.selectedSubjectIds && payload.selectedSubjectIds.length > 0) &&
-    !(payload.selectedSubjects && payload.selectedSubjects.length > 0)
-  ) {
-    throw new Error("Select at least one subject")
-  }
-
-  console.log(
-    "[QR] Sending student ID to API:",
-    payload.scannedStudentId,
-    "subjects:",
-    payload.selectedSubjects,
-    "subjectIds:",
-    payload.selectedSubjectIds,
-  )
-  const { data } = await apiClient.post<AttendanceScanResponse>("/api/attendance/scan", {
-    student_id: payload.scannedStudentId.trim(),
-    classroom_id: payload.classroomId,
-    status: "Present",
-    scanned_at: new Date().toISOString(),
-    prevent_duplicate: true,
-    selected_subjects: payload.selectedSubjects,
-    selected_subject_ids: payload.selectedSubjectIds,
+  return processAttendance({
+    studentId: payload.scannedStudentId,
+    classroomId: payload.classroomId,
+    selectedSubjects: payload.selectedSubjects,
+    selectedSubjectIds: payload.selectedSubjectIds,
+    attendanceMethod: "QR",
   })
-  return data
 }
 
 export async function getCenterAttendance(params?: {

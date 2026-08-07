@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -450,10 +451,12 @@ export function InstitutionAdminShell({
                   align="end"
                   className="w-56 rounded-xl border-[#A2D4ED]/60 bg-white shadow-[0_18px_50px_rgba(5,8,46,0.1)]"
                 >
-                  <DropdownMenuLabel className="font-normal">
-                    <p className="text-sm font-semibold text-[#05082E]">{user.full_name}</p>
-                    <p className="truncate text-xs text-[#0047AB]/70">{user.email}</p>
-                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="font-normal">
+                      <p className="text-sm font-semibold text-[#05082E]">{user.full_name}</p>
+                      <p className="truncate text-xs text-[#0047AB]/70">{user.email}</p>
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

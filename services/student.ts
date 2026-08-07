@@ -114,13 +114,23 @@ export async function listStudentGrades() {
   return data.grades ?? []
 }
 
-export async function searchStudents(query: string) {
-  const { data } = await apiClient.get<{ students: Student[]; count?: number; search?: string | null }>(
-    "/api/students",
-    {
-      params: { search: query.trim() },
+export async function searchStudents(
+  query: string,
+  options?: { grade?: string },
+) {
+  const grade = options?.grade?.trim()
+  const { data } = await apiClient.get<{
+    students: Student[]
+    count?: number
+    search?: string | null
+    grade?: string | null
+    grades?: string[]
+  }>("/api/students", {
+    params: {
+      search: query.trim() || undefined,
+      ...(grade && grade.toLowerCase() !== "all" ? { grade } : {}),
     },
-  )
+  })
   return data
 }
 

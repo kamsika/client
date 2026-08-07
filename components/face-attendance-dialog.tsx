@@ -21,14 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  detectFaceDescriptor,
+  detectFacesWithBoxes,
   getCameraErrorMessage,
   loadFaceModels,
   matchFaceDescriptor,
   startFaceCamera,
   stopFaceCamera,
 } from "@/lib/face-recognition"
-import { getApiErrorMessage } from "@/lib/api-errors"
+import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
+import { selectItems } from "@/lib/select-items"
 import { markKioskAttendance, type AttendanceSubjectOption } from "@/services/attendance"
 import { listFaceProfiles, saveStudentFace, type StudentFaceProfile } from "@/services/student-face"
 
@@ -60,6 +61,8 @@ export function FaceAttendanceDialog({
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [modelsReady, setModelsReady] = useState(false)
   const [lastMatch, setLastMatch] = useState<string | null>(null)
+  const [detectionHint, setDetectionHint] = useState<string | null>(null)
+  const [detectedFaceCount, setDetectedFaceCount] = useState(0)
   const [enrollStudentId, setEnrollStudentId] = useState<string>("")
   const [enrolling, setEnrolling] = useState(false)
   const [pendingSelection, setPendingSelection] = useState<{
@@ -199,11 +202,22 @@ export function FaceAttendanceDialog({
     async (studentId: number, label: string) => {
       if (pendingSelection) return
       const now = Date.now()
-      if (now < recognitionPausedUntilRef.current) {
+      const lastMarkedAt = recentMarksRef.current.get(studentId)
+
+      // Returning student already marked this dialog session.
+      if (lastMarkedAt && now - lastMarkedAt < 7000) {
+        setLastMatch(`${label} · Already marked`)
+        setDetectionHint("Already marked")
+        toast.message(`${label} is already marked for this class.`)
         return
       }
-      const lastMarkedAt = recentMarksRef.current.get(studentId)
-      if (lastMarkedAt && now - lastMarkedAt < 7000) {
+      if (now < recognitionPausedUntilRef.current && lastMarkedAt) {
+        setLastMatch(`${label} · Already marked`)
+        setDetectionHint("Already marked")
+        toast.message(`${label} is already marked for this class.`)
+        return
+      }
+      if (now < recognitionPausedUntilRef.current) {
         return
       }
 
@@ -234,6 +248,8 @@ export function FaceAttendanceDialog({
           return
         }
         if (result.status === "AlreadyMarked") {
+          setLastMatch(`${label} · Already marked`)
+          setDetectionHint("Already marked")
           toast.message(result.message || `${label} is already marked for this class.`)
           return
         }
@@ -244,9 +260,16 @@ export function FaceAttendanceDialog({
           recognitionPausedUntilRef.current = 0
           return
         }
-        toast.success("Attendance Recorded Successfully")
+        toast.success("Face Updated Successfully")
       } catch (error) {
-        toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${label}`))
+        if (isAlreadyScannedError(error)) {
+          recentMarksRef.current.set(studentId, Date.now())
+          setLastMatch(`${label} · Already marked`)
+          setDetectionHint("Already marked")
+          toast.message(getApiErrorMessage(error, `${label} is already marked for this class.`))
+        } else {
+          toast.error(getApiErrorMessage(error, `Failed to mark attendance for ${label}`))
+        }
       } finally {
         markingRef.current = false
       }
@@ -264,12 +287,41 @@ export function FaceAttendanceDialog({
         selectedSubjects,
       })
       const newlyMarked = result.newlyMarkedSubjects ?? []
-      if (newlyMarked.length > 0) toast.success(`Marked Present: ${newlyMarked.join(", ")}`)
+      if (newlyMarked.length > 0) toast.success("Face Updated Successfully")
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Failed to confirm class attendance"))
       throw error
     }
   }
+
+  useEffect(() => {
+    if (!open || !cameraActive || mode !== "enroll") {
+      return
+    }
+
+    const interval = window.setInterval(async () => {
+      const video = videoRef.current
+      if (!video) return
+      try {
+        const detections = await detectFacesWithBoxes(video)
+        const faceCount = detections.length
+        setDetectedFaceCount(faceCount)
+        if (faceCount === 0) {
+          setDetectionHint("No face detected. Please stand in front of the camera.")
+        } else if (faceCount > 1) {
+          setDetectionHint(
+            "Multiple faces detected. Please ensure only one student is in front of the camera.",
+          )
+        } else {
+          setDetectionHint(null)
+        }
+      } catch {
+        // Ignore transient frame errors.
+      }
+    }, 500)
+
+    return () => window.clearInterval(interval)
+  }, [open, cameraActive, mode])
 
   useEffect(() => {
     if (!open || !cameraActive || mode !== "mark") {
@@ -293,7 +345,24 @@ export function FaceAttendanceDialog({
       }
 
       try {
-        const descriptor = await detectFaceDescriptor(video)
+        const detections = await detectFacesWithBoxes(video)
+        const faceCount = detections.length
+        setDetectedFaceCount(faceCount)
+
+        if (faceCount === 0) {
+          setDetectionHint("No face detected. Please stand in front of the camera.")
+          return
+        }
+
+        if (faceCount > 1) {
+          setDetectionHint(
+            "Multiple faces detected. Please ensure only one student is in front of the camera.",
+          )
+          return
+        }
+
+        setDetectionHint(null)
+        const descriptor = detections[0]?.descriptor
         if (!descriptor) {
           return
         }
@@ -309,6 +378,8 @@ export function FaceAttendanceDialog({
 
         if (match) {
           await handleMarkMatch(match.studentId, match.label)
+        } else {
+          setDetectionHint("Face not registered.")
         }
       } catch {
         // Ignore transient detection errors between frames.
@@ -330,15 +401,28 @@ export function FaceAttendanceDialog({
       return
     }
 
+    if (detectedFaceCount !== 1) {
+      toast.error(
+        detectedFaceCount > 1
+          ? "Multiple faces detected. Please ensure only one student is in front of the camera."
+          : "No face detected. Please stand in front of the camera.",
+      )
+      return
+    }
+
     setEnrolling(true)
     try {
-      const descriptor = await detectFaceDescriptor(video)
-      if (!descriptor) {
-        toast.error("No face detected. Ask the student to look at the camera.")
+      const detections = await detectFacesWithBoxes(video)
+      if (detections.length !== 1) {
+        toast.error(
+          detections.length > 1
+            ? "Multiple faces detected. Please ensure only one student is in front of the camera."
+            : "No face detected. Please stand in front of the camera.",
+        )
         return
       }
 
-      await saveStudentFace(Number(enrollStudentId), descriptor)
+      await saveStudentFace(Number(enrollStudentId), detections[0].descriptor)
       toast.success("Face profile saved")
       await loadProfiles()
     } catch {
@@ -432,6 +516,18 @@ export function FaceAttendanceDialog({
             </div>
           )}
 
+          {cameraActive && detectionHint && (
+            <p
+              className={`rounded-lg border px-3 py-2 text-sm whitespace-pre-line ${
+                detectedFaceCount > 1
+                  ? "border-red-200 bg-red-50 text-red-800"
+                  : "border-[#A2D4ED]/60 bg-[#f8fbfe] text-[#0047AB]"
+              }`}
+            >
+              {detectionHint}
+            </p>
+          )}
+
           {mode === "mark" ? (
             <div className="space-y-2 text-sm">
               <p className="text-muted-foreground">
@@ -450,8 +546,19 @@ export function FaceAttendanceDialog({
             </div>
           ) : (
             <div className="space-y-3">
-              <Select value={enrollStudentId} onValueChange={(value) => value && setEnrollStudentId(value)}>
-                <SelectTrigger>
+              <Select
+                value={enrollStudentId}
+                onValueChange={(value) => value && setEnrollStudentId(value)}
+                items={selectItems(
+                  profiles.map((profile) => ({
+                    value: profile.id,
+                    label: `${profile.full_name || profile.registration_no}${
+                      profile.has_face_descriptor ? " (re-enroll)" : ""
+                    }`,
+                  })),
+                )}
+              >
+                <SelectTrigger className="w-full min-w-[16rem]">
                   <SelectValue placeholder="Select student to enroll" />
                 </SelectTrigger>
                 <SelectContent>
@@ -466,7 +573,7 @@ export function FaceAttendanceDialog({
               <Button
                 type="button"
                 className="w-full"
-                disabled={!cameraActive || enrolling || !enrollStudentId}
+                disabled={!cameraActive || enrolling || !enrollStudentId || detectedFaceCount !== 1}
                 onClick={() => void handleEnrollFace()}
               >
                 {enrolling ? "Saving face..." : "Capture & Save Face"}

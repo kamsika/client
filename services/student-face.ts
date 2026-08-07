@@ -4,6 +4,9 @@ export interface StudentFaceProfile {
   id: number
   registration_no: string
   full_name: string | null
+  grade?: string | null
+  enrolled_subjects?: string[]
+  enrolledSubjects?: string[]
   descriptor: number[] | null
   has_face_descriptor: boolean
 }

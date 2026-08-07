@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table"
 import { downloadBlob } from "@/lib/download"
 import { localTodayISO } from "@/lib/format-time"
+import { selectItems } from "@/lib/select-items"
 import {
   exportAttendanceReportCsv,
   exportAttendanceReportPdf,
@@ -150,6 +151,12 @@ export function AttendanceReportsPanel() {
             <Select
               value={selectedClassroomId}
               onValueChange={(value) => value && setSelectedClassroomId(value)}
+              items={selectItems(
+                classrooms.map((cls) => ({
+                  value: cls.id,
+                  label: cls.name,
+                })),
+              )}
             >
               <SelectTrigger id="report-classroom" className="w-full">
                 <SelectValue placeholder="Select classroom" />
