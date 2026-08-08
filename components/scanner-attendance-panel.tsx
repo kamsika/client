@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import { ScannedStudentDetailsCard } from "@/components/scanned-student-details-card"
+import { FeeSummaryCard } from "@/components/fee-summary-card"
 import { getApiErrorMessage, isAlreadyScannedError } from "@/lib/api-errors"
 import { useOnlineStatus } from "@/hooks/use-online-status"
 import { OFFLINE_ATTENDANCE_MESSAGE } from "@/lib/pwa"
@@ -13,6 +14,7 @@ import {
   type AttendanceScanResponse,
 } from "@/services/attendance"
 import type { Attendance, Student } from "@/types"
+import { getStudentFeeSummary, type FeeSummary } from "@/services/tuition"
 
 export type ScannerAttendanceComplete = {
   scannedId: string
@@ -58,8 +60,21 @@ export function ScannerAttendancePanel({
 }: ScannerAttendancePanelProps) {
   const [marking, setMarking] = useState(false)
   const [localMarked, setLocalMarked] = useState(marked)
+  const [feeSummary, setFeeSummary] = useState<FeeSummary | null>(null)
+  const [feeUnavailable, setFeeUnavailable] = useState(false)
   const online = useOnlineStatus()
   const isMarked = marked || localMarked
+
+  useEffect(() => {
+    if (attendanceMethod !== "QR") return
+    let cancelled = false
+    setFeeSummary(null)
+    setFeeUnavailable(false)
+    void getStudentFeeSummary(student.id)
+      .then((summary) => { if (!cancelled) setFeeSummary(summary) })
+      .catch(() => { if (!cancelled) setFeeUnavailable(true) })
+    return () => { cancelled = true }
+  }, [attendanceMethod, student.id])
 
   async function handleMarkAttendance(selection: {
     selectedSubjectIds: number[]
@@ -190,14 +205,17 @@ export function ScannerAttendancePanel({
   }
 
   return (
-    <ScannedStudentDetailsCard
-      student={student}
-      marking={marking}
-      marked={isMarked}
-      actionDisabled={!online}
-      actionDisabledReason={OFFLINE_ATTENDANCE_MESSAGE}
-      onMarkAttendance={(selection) => void handleMarkAttendance(selection)}
-      onDismiss={onDismiss}
-    />
+    <div className="space-y-3">
+      {attendanceMethod === "QR" ? <FeeSummaryCard summary={feeSummary} unavailable={feeUnavailable} /> : null}
+      <ScannedStudentDetailsCard
+        student={student}
+        marking={marking}
+        marked={isMarked}
+        actionDisabled={!online}
+        actionDisabledReason={OFFLINE_ATTENDANCE_MESSAGE}
+        onMarkAttendance={(selection) => void handleMarkAttendance(selection)}
+        onDismiss={onDismiss}
+      />
+    </div>
   )
 }

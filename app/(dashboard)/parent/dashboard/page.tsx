@@ -19,6 +19,8 @@ import { formatLocalDateTime } from "@/lib/format-time"
 import { getStudentAttendance } from "@/services/attendance"
 import { getMyChildren } from "@/services/student"
 import type { Attendance, Student } from "@/types"
+import { FeeSummaryCard } from "@/components/fee-summary-card"
+import { getStudentFeeHistory, getStudentFeeSummary, type FeeSummary } from "@/services/tuition"
 
 const parentNav = [{ href: "/parent/dashboard", label: "Dashboard" }]
 
@@ -26,6 +28,9 @@ export default function ParentDashboardPage() {
   const [children, setChildren] = useState<Student[]>([])
   const [selectedId, setSelectedId] = useState<string>("")
   const [attendance, setAttendance] = useState<Attendance[]>([])
+  const [feeSummary, setFeeSummary] = useState<FeeSummary | null>(null)
+  const [feeUnavailable, setFeeUnavailable] = useState(false)
+  const [feeHistory, setFeeHistory] = useState<Awaited<ReturnType<typeof getStudentFeeHistory>> | null>(null)
 
   useEffect(() => {
     getMyChildren()
@@ -38,9 +43,14 @@ export default function ParentDashboardPage() {
 
   useEffect(() => {
     if (!selectedId) return
+    setFeeUnavailable(false)
     getStudentAttendance(Number(selectedId))
       .then((data) => setAttendance(data.attendance))
       .catch(() => toast.error("Failed to load attendance"))
+    getStudentFeeSummary(Number(selectedId))
+      .then(setFeeSummary)
+      .catch(() => setFeeUnavailable(true))
+    getStudentFeeHistory(Number(selectedId)).then(setFeeHistory).catch(() => setFeeHistory(null))
   }, [selectedId])
 
   const columns: ColumnDef<Attendance>[] = [
@@ -118,6 +128,11 @@ export default function ParentDashboardPage() {
             )}
           </CardContent>
         </Card>
+        {selectedId ? <FeeSummaryCard summary={feeSummary} unavailable={feeUnavailable} /> : null}
+        {selectedId && feeHistory ? <Card><CardHeader><CardTitle>Invoice & Payment History</CardTitle><CardDescription>Receipts and historical subject charges for the selected child.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2"><p className="font-medium">Invoices</p>{feeHistory.invoices.length === 0 ? <p className="text-muted-foreground text-sm">No invoices yet.</p> : feeHistory.invoices.map((invoice) => <div key={String(invoice.id)} className="rounded-lg border p-3 text-sm"><div className="flex justify-between"><span>{String(invoice.billing_period)}</span><span>{String(invoice.status)}</span></div><p>Balance: Rs. {Number(invoice.balance_due || 0).toLocaleString()}</p></div>)}</div>
+          <div className="space-y-2"><p className="font-medium">Payments & receipts</p>{feeHistory.payments.length === 0 ? <p className="text-muted-foreground text-sm">No payments yet.</p> : feeHistory.payments.map((payment) => <div key={String(payment.id)} className="rounded-lg border p-3 text-sm"><div className="flex justify-between"><span>Rs. {Number(payment.amount || 0).toLocaleString()}</span><span>{String(payment.status)}</span></div><p>Receipt: {String(payment.receipt_number || "—")}</p></div>)}</div>
+        </CardContent></Card> : null}
       </div>
     </DashboardShell>
   )

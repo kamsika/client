@@ -8,6 +8,8 @@ export interface CreateStudentInput {
   gender: "Male" | "Female" | "Other"
   contact: string
   enrolledSubjects?: string[]
+  joiningDate?: string
+  discountAmount?: number
 }
 
 export interface UpdateStudentInput {
@@ -23,6 +25,8 @@ export async function createStudent(input: CreateStudentInput) {
   const { data } = await apiClient.post<{ student: Student; message: string }>("/api/students", {
     ...input,
     enrolledSubjects: input.enrolledSubjects ?? [],
+    joining_date: input.joiningDate,
+    discount_amount: input.discountAmount ?? 0,
   })
   return data
 }
