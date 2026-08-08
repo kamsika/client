@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Search, Wallet } from "lucide-react"
 import { toast } from "sonner"
 
 import { InstitutionAdminShell } from "@/components/institution-admin-shell"
+import { TuitionBillingManager } from "@/components/tuition-billing-manager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -170,6 +171,8 @@ export default function FeeManagementPage() {
       allowedRoles={["institution_admin"]}
     >
       <div className="space-y-6">
+        <TuitionBillingManager />
+        <div className="border-t border-[#A2D4ED]/50 pt-6" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-[#05082E]">

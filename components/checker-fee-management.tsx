@@ -35,7 +35,8 @@ import {
   markPaymentAsPaid,
 } from "@/services/payment"
 import { listStudents } from "@/services/student"
-import type { Student, StudentFeePayment } from "@/types"
+import type { StudentFeePayment } from "@/types"
+import { TuitionPaymentRecorder } from "@/components/tuition-payment-recorder"
 
 const cardShell =
   "rounded-2xl border border-[#A2D4ED]/60 bg-white shadow-[0_12px_40px_rgba(5,8,46,0.05)]"
@@ -222,6 +223,8 @@ export function CheckerFeeManagement() {
           Refresh
         </Button>
       </div>
+
+      <TuitionPaymentRecorder />
 
       <div className={cn(cardShell, "space-y-4 p-4 sm:p-5")}>
         <div className="space-y-2">

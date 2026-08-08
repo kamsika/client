@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { EnrolledSubjectsPicker } from "@/components/enrolled-subjects-picker"
@@ -20,6 +20,7 @@ import { findDuplicateStudent, getNextStudentId } from "@/lib/generate-student-i
 import { getApiErrorMessage } from "@/lib/api-errors"
 import { cn } from "@/lib/utils"
 import { createStudent } from "@/services/student"
+import { previewRegistrationFees } from "@/services/tuition"
 import type { Student } from "@/types"
 
 const fieldClass =
@@ -48,6 +49,8 @@ const emptyForm = {
   gender: "" as GenderOption | "",
   contact: "",
   enrolledSubjects: [] as string[],
+  joiningDate: new Date().toISOString().slice(0, 10),
+  discount: "",
 }
 
 export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminAddStudentFormProps) {
@@ -56,6 +59,22 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
   const [submitting, setSubmitting] = useState(false)
   const [savedStudent, setSavedStudent] = useState<Student | null>(null)
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null)
+  const [feePreview, setFeePreview] = useState<Awaited<ReturnType<typeof previewRegistrationFees>> | null>(null)
+
+  useEffect(() => {
+    if (form.enrolledSubjects.length === 0) {
+      setFeePreview(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void previewRegistrationFees({
+        subjects: form.enrolledSubjects,
+        joiningDate: form.joiningDate,
+        discount: Number(form.discount || 0),
+      }).then(setFeePreview).catch(() => setFeePreview(null))
+    }, 200)
+    return () => window.clearTimeout(timer)
+  }, [form.enrolledSubjects, form.joiningDate, form.discount])
 
   const previewStudentId = useMemo(
     () => getNextStudentId(existingStudents),
@@ -122,6 +141,8 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
         gender: form.gender,
         contact: form.contact.trim(),
         enrolledSubjects: form.enrolledSubjects,
+        joiningDate: form.joiningDate,
+        discountAmount: Number(form.discount || 0),
       })
 
       setSavedStudent(result.student)
@@ -314,6 +335,48 @@ export function AdminAddStudentForm({ existingStudents, onStudentAdded }: AdminA
               onChange={(enrolledSubjects) => setForm({ ...form, enrolledSubjects })}
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="student-joining-date">Joining date</Label>
+            <Input
+              id="student-joining-date"
+              type="date"
+              className={fieldClass}
+              value={form.joiningDate}
+              onChange={(event) => setForm({ ...form, joiningDate: event.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="student-discount">Monthly discount (LKR)</Label>
+            <Input
+              id="student-discount"
+              type="number"
+              min="0"
+              step="0.01"
+              className={fieldClass}
+              value={form.discount}
+              onChange={(event) => setForm({ ...form, discount: event.target.value })}
+            />
+          </div>
+
+          {form.enrolledSubjects.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-[#A2D4ED]/50 bg-[#f8fbfe] p-4 sm:col-span-2">
+              <p className="font-medium text-[#05082E]">Subject fee preview</p>
+              {feePreview?.lines.map((line) => (
+                <div key={line.subject_id} className="flex justify-between text-sm">
+                  <span>{line.subject_name}</span>
+                  <span className={line.configured ? "font-medium" : "text-amber-700"}>
+                    {line.configured ? `Rs. ${Number(line.monthly_fee).toLocaleString()}` : "Fee not configured for this subject."}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t pt-2 text-sm">
+                <div className="flex justify-between"><span>Monthly fee</span><span>Rs. {Number(feePreview?.monthly_fee || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span>Discount</span><span>Rs. {Number(feePreview?.discount || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between font-semibold"><span>Net monthly fee</span><span>Rs. {Number(feePreview?.net_monthly_fee || 0).toLocaleString()}</span></div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="sm:col-span-2">
             <Button type="submit" className={cn("h-11 w-full sm:w-auto", primaryBtn)} disabled={submitting}>

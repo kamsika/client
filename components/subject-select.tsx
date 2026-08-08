@@ -65,12 +65,18 @@ export function SubjectSelect({
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
   const [teacherId, setTeacherId] = useState("")
+  const [monthlyFee, setMonthlyFee] = useState("")
+  const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 7) + "-01")
+  const [description, setDescription] = useState("")
   const [error, setError] = useState("")
 
   function resetAddForm() {
     setName("")
     setCode("")
     setTeacherId("")
+    setMonthlyFee("")
+    setEffectiveFrom(new Date().toISOString().slice(0, 7) + "-01")
+    setDescription("")
     setError("")
   }
 
@@ -78,6 +84,10 @@ export function SubjectSelect({
     const trimmed = name.trim()
     if (!trimmed) {
       setError("Subject name is required")
+      return
+    }
+    if (monthlyFee.trim() && (!Number.isFinite(Number(monthlyFee)) || Number(monthlyFee) < 0)) {
+      setError("Enter a valid monthly fee")
       return
     }
 
@@ -88,6 +98,9 @@ export function SubjectSelect({
         name: trimmed,
         code: code.trim() || undefined,
         teacher_id: teacherId ? Number(teacherId) : undefined,
+        description: description.trim() || undefined,
+        monthly_fee: monthlyFee.trim() ? Number(monthlyFee) : undefined,
+        effective_from: effectiveFrom,
       })
       onSubjectCreated(subject)
       onValueChange(subject.name, subject)
@@ -168,6 +181,26 @@ export function SubjectSelect({
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                 />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[#05082E]">Monthly Fee (LKR, optional)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={fieldClass}
+                  placeholder="e.g. 2000"
+                  value={monthlyFee}
+                  onChange={(e) => setMonthlyFee(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[#05082E]">Fee effective from</Label>
+                <Input type="date" className={fieldClass} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[#05082E]">Description (optional)</Label>
+                <Input className={fieldClass} value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label className="text-[#05082E]">Subject Code (optional)</Label>

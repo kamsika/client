@@ -10,6 +10,9 @@ export async function createSubject(payload: {
   name: string
   code?: string
   teacher_id?: number
+  description?: string
+  monthly_fee?: number
+  effective_from?: string
 }) {
   const { data } = await apiClient.post<{ subject: Subject }>("/api/subjects", payload)
   return data.subject
