@@ -11,7 +11,14 @@ export type SubjectFeeLine = {
 export type FeeSummary = {
   student_id: number
   billing_period: string
-  overall_status: "PAID" | "PENDING"
+  overall_status: "PAID" | "PARTIALLY_PAID" | "UNPAID"
+  student_name?: string
+  billing_month?: string
+  total_fee?: number
+  total_paid?: number
+  total_pending?: number
+  paid_subject_count?: number
+  pending_subject_count?: number
   subject_charges: number
   previous_balance?: number
   discount_amount?: number
@@ -34,6 +41,7 @@ export type FeeSummary = {
     balance_due: number
     status: string
   }>
+  subjects?: FeeSummary["lines"]
 }
 
 export async function previewRegistrationFees(payload: {
@@ -52,12 +60,33 @@ export async function previewRegistrationFees(payload: {
   return data
 }
 
-export async function listSubjectFees(history = false) {
+export async function listSubjectFees(history = false, params?: { search?: string; status?: string }) {
   const { data } = await apiClient.get<{ subject_fees: Array<Record<string, unknown>> }>(
     "/api/tuition/subject-fees",
-    { params: { history } },
+    { params: { history, search: params?.search, status: params?.status } },
   )
   return data.subject_fees
+}
+
+export async function updateSubjectFee(feeId: number, payload: {
+  monthlyFee: number
+  currency?: string
+  effectiveFrom: string
+  isActive?: boolean
+  description?: string
+}) {
+  const { data } = await apiClient.put<{ subject_fee: Record<string, unknown> }>(
+    `/api/tuition/subject-fees/${feeId}`,
+    payload,
+  )
+  return data.subject_fee
+}
+
+export async function deleteSubjectFee(feeId: number) {
+  const { data } = await apiClient.delete<{ deleted: boolean; deactivated: boolean }>(
+    `/api/tuition/subject-fees/${feeId}`,
+  )
+  return data
 }
 
 export async function configureSubjectFee(subjectId: number, payload: {
