@@ -66,7 +66,6 @@ export function ScannerAttendancePanel({
   const isMarked = marked || localMarked
 
   useEffect(() => {
-    if (attendanceMethod !== "QR") return
     let cancelled = false
     setFeeSummary(null)
     setFeeUnavailable(false)
@@ -206,7 +205,7 @@ export function ScannerAttendancePanel({
 
   return (
     <div className="space-y-3">
-      {attendanceMethod === "QR" ? <FeeSummaryCard summary={feeSummary} unavailable={feeUnavailable} /> : null}
+      <FeeSummaryCard summary={feeSummary} unavailable={feeUnavailable} />
       <ScannedStudentDetailsCard
         student={student}
         marking={marking}

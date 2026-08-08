@@ -16,6 +16,7 @@ import { listStudents } from "@/services/student"
 import { listSubjects } from "@/services/subject"
 import {
   configureSubjectFee,
+  deleteSubjectFee,
   downloadTuitionReceipt,
   generateAllInvoices,
   generateInvoice,
@@ -24,6 +25,7 @@ import {
   listSubjectFees,
   listTuitionPayments,
   recordTuitionPayment,
+  updateSubjectFee,
 } from "@/services/tuition"
 import type { Student, Subject } from "@/types"
 
@@ -52,6 +54,9 @@ export function TuitionBillingManager() {
   const [paymentMethod, setPaymentMethod] = useState("CASH")
   const [reference, setReference] = useState("")
   const [saving, setSaving] = useState(false)
+  const [feeSearch, setFeeSearch] = useState("")
+  const [feeStatus, setFeeStatus] = useState("all")
+  const [editingFeeId, setEditingFeeId] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -78,13 +83,31 @@ export function TuitionBillingManager() {
     if (!subjectId || Number(feeAmount) < 0 || !effectiveFrom) return toast.error("Select a subject and enter a valid fee")
     setSaving(true)
     try {
-      await configureSubjectFee(Number(subjectId), { monthlyFee: Number(feeAmount), currency: "LKR", effectiveFrom })
-      toast.success("Subject fee scheduled")
+      const payload = { monthlyFee: Number(feeAmount), currency: "LKR", effectiveFrom, isActive: true }
+      if (editingFeeId) await updateSubjectFee(editingFeeId, payload)
+      else await configureSubjectFee(Number(subjectId), payload)
+      toast.success(editingFeeId ? "Subject fee updated" : "Subject fee scheduled")
       setFeeAmount("")
+      setEditingFeeId(null)
       await load()
     } catch (error) { toast.error(getApiErrorMessage(error, "Failed to configure fee")) }
     finally { setSaving(false) }
   }
+
+  async function removeFee(feeId: number) {
+    if (!window.confirm("Delete this unused fee, or deactivate it if historical records use it?")) return
+    try {
+      const result = await deleteSubjectFee(feeId)
+      toast.success(result.deleted ? "Subject fee deleted" : "Used subject fee deactivated")
+      await load()
+    } catch (error) { toast.error(getApiErrorMessage(error, "Failed to remove fee")) }
+  }
+
+  const visibleFees = fees.filter((fee) => {
+    const matchesSearch = String(fee.subject_name || "").toLowerCase().includes(feeSearch.trim().toLowerCase())
+    const active = Boolean(fee.is_active)
+    return matchesSearch && (feeStatus === "all" || (feeStatus === "active" ? active : !active))
+  })
 
   async function createMonthlyInvoice() {
     if (!studentId) return toast.error("Select a student")
@@ -149,13 +172,14 @@ export function TuitionBillingManager() {
           <TabsTrigger value="audit">Credits, Refunds & Audit</TabsTrigger>
         </TabsList>
         <TabsContent value="fees" className="space-y-4">
-          <Card className={cardShell}><CardHeader><CardTitle>Configure subject fee</CardTitle><CardDescription>New effective months preserve all historical invoice values.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-4">
+          <Card className={cardShell}><CardHeader><CardTitle>{editingFeeId ? "Edit subject fee" : "Set Subject Fee"}</CardTitle><CardDescription>New effective months preserve all historical invoice values.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-4">
             <div><Label>Subject</Label><Select value={subjectId || null} onValueChange={(v) => v && setSubjectId(v)}><SelectTrigger className={fieldClass}><SelectValue placeholder="Select subject" /></SelectTrigger><SelectContent>{subjects.map((subject) => <SelectItem key={subject.id} value={String(subject.id)}>{subject.name}</SelectItem>)}</SelectContent></Select></div>
             <div><Label>Monthly fee (LKR)</Label><Input type="number" min="0" step="0.01" className={fieldClass} value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} /></div>
             <div><Label>Effective from</Label><Input type="date" className={fieldClass} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></div>
-            <div className="flex items-end"><Button disabled={saving} onClick={() => void saveFee()}>{saving && <Loader2 className="size-4 animate-spin" />}Save fee</Button></div>
+            <div className="flex items-end gap-2"><Button disabled={saving} onClick={() => void saveFee()}>{saving && <Loader2 className="size-4 animate-spin" />}Save fee</Button>{editingFeeId ? <Button variant="outline" onClick={() => { setEditingFeeId(null); setFeeAmount("") }}>Cancel</Button> : null}</div>
           </CardContent></Card>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{fees.map((fee) => <Card key={String(fee.id)} className={cardShell}><CardHeader className="p-4"><CardTitle className="text-base">{String(fee.subject_name || "Subject")}</CardTitle><CardDescription>{String(fee.effective_from)} — {String(fee.effective_to || "current")}</CardDescription></CardHeader><CardContent className="flex justify-between px-4 pb-4"><span className="font-semibold">{money(fee.monthly_fee)}</span><Badge variant="outline">{fee.is_active ? "Active" : "Inactive"}</Badge></CardContent></Card>)}</div>
+          <div className="flex flex-col gap-3 sm:flex-row"><Input className="max-w-sm" placeholder="Search subject fees" value={feeSearch} onChange={(e) => setFeeSearch(e.target.value)} /><Select value={feeStatus} onValueChange={(v) => v && setFeeStatus(v)}><SelectTrigger className="w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleFees.map((fee) => <Card key={String(fee.id)} className={cardShell}><CardHeader className="p-4"><CardTitle className="text-base">{String(fee.subject_name || "Subject")}</CardTitle><CardDescription>{String(fee.effective_from)} — {String(fee.effective_to || "current")}</CardDescription></CardHeader><CardContent className="space-y-3 px-4 pb-4"><div className="flex justify-between"><span className="font-semibold">{money(fee.monthly_fee)} · {String(fee.currency || "LKR")}</span><Badge variant="outline">{fee.is_active ? "Active" : "Inactive"}</Badge></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => { setEditingFeeId(Number(fee.id)); setSubjectId(String(fee.subject_id)); setFeeAmount(String(fee.monthly_fee)); setEffectiveFrom(String(fee.effective_from)) }}>Edit</Button><Button size="sm" variant="outline" className="text-red-700" onClick={() => void removeFee(Number(fee.id))}>Delete / Deactivate</Button></div></CardContent></Card>)}</div>
         </TabsContent>
         <TabsContent value="accounts" className="space-y-4">
           <Card className={cardShell}><CardHeader><CardTitle>Generate monthly invoice</CardTitle><CardDescription>Idempotent: repeated generation returns the existing invoice.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row"><Select value={studentId || null} onValueChange={(v) => v && setStudentId(v)}><SelectTrigger className="max-w-md"><SelectValue placeholder="Select student" /></SelectTrigger><SelectContent>{students.map((student) => <SelectItem key={student.id} value={String(student.id)}>{student.full_name} · {student.registration_no}</SelectItem>)}</SelectContent></Select><Button disabled={saving} onClick={() => void createMonthlyInvoice()}>Generate selected</Button><Button variant="outline" disabled={saving} onClick={() => void createAllMonthlyInvoices()}>Generate all · {currentPeriod}</Button></CardContent></Card>
